@@ -1,4 +1,4 @@
- from g2p import make_g2p
+# from g2p import make_g2p
 from phonemizer import phonemize
 # transducer = make_g2p('eng', 'eng-ipa')
 
