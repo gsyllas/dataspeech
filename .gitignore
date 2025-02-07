@@ -4,3 +4,4 @@ env_dataspeech/*
 wip_scripts/*
 plots/*
 .vscode/*
+tmp_*/*
