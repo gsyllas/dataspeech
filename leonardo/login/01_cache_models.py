@@ -17,8 +17,31 @@ import sys
 from pathlib import Path
 
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
 def _info(msg: str) -> None:
     print(f"[cache] {msg}", flush=True)
+
+
+def normalize_cache_env() -> None:
+    """Keep cache downloads inside this repo unless CACHE_ROOT is explicit."""
+    cache_root = Path(os.environ.get("CACHE_ROOT", REPO_ROOT / "cache")).resolve()
+    expected = {
+        "HF_HOME": cache_root / "hf",
+        "HF_HUB_CACHE": cache_root / "hf",
+        "HUGGINGFACE_HUB_CACHE": cache_root / "hf",
+        "TRANSFORMERS_CACHE": cache_root / "hf",
+        "HF_DATASETS_CACHE": cache_root / "hf" / "datasets",
+        "TORCH_HOME": cache_root / "torch",
+        "PENN_CACHE": cache_root / "penn",
+    }
+    for name, path in expected.items():
+        old = os.environ.get(name)
+        new = str(path)
+        if old and Path(old).resolve() != path:
+            _info(f"ignoring inherited {name}={old}; using {new}")
+        os.environ[name] = new
 
 
 def cache_brouhaha() -> None:
@@ -94,14 +117,7 @@ def cache_llm() -> None:
 
 def main() -> int:
     # Caches must be set BEFORE importing torch / hf_hub.
-    required = ["HF_HOME", "TORCH_HOME"]
-    missing = [v for v in required if not os.environ.get(v)]
-    if missing:
-        print(
-            f"[cache] missing env vars {missing}; source leonardo/env.sh first",
-            file=sys.stderr,
-        )
-        return 1
+    normalize_cache_env()
 
     Path(os.environ["HF_HOME"]).mkdir(parents=True, exist_ok=True)
     Path(os.environ["TORCH_HOME"]).mkdir(parents=True, exist_ok=True)
