@@ -1,18 +1,24 @@
+import os
 from pyannote.audio import Model
 from pathlib import Path
 from brouhaha.pipeline import RegressiveActivityDetectionPipeline
-import torch 
+import torch
 from huggingface_hub import hf_hub_download
 import numpy as np
 
 model = None
 ratio = 16000/270
 
+# Brouhaha checkpoint repo. Override via the BROUHAHA_REPO env var so the same
+# value can be honored by both pre-caching (login node) and inference (compute
+# node), which matters when HF_HUB_OFFLINE=1.
+BROUHAHA_REPO = os.environ.get("BROUHAHA_REPO", "ylacombe/brouhaha-best")
+
 def snr_apply(batch, rank=None, audio_column_name="audio", batch_size=32):
     global model
     if model is None:
         model = Model.from_pretrained(
-            Path(hf_hub_download(repo_id="ylacombe/brouhaha-best", filename="best.ckpt")),
+            Path(hf_hub_download(repo_id=BROUHAHA_REPO, filename="best.ckpt")),
             strict=False,
         )
     if rank is not None or torch.cuda.device_count() > 0:

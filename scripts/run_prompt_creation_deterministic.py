@@ -3,8 +3,18 @@ import os
 import sys
 from dataclasses import dataclass, field
 from typing import Optional
-from datasets import DatasetDict, load_dataset
+from datasets import DatasetDict, load_dataset, load_from_disk
 import shutil
+
+
+def _is_save_to_disk_dir(path):
+    # Only DatasetDict (not bare Dataset) is supported as a local path: the
+    # downstream code iterates over named splits.
+    return (
+        isinstance(path, str)
+        and os.path.isdir(path)
+        and os.path.isfile(os.path.join(path, "dataset_dict.json"))
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +77,14 @@ def main():
     if data_args.overwrite_output_dir and os.path.exists(data_args.output_dir):
         shutil.rmtree(data_args.output_dir)
 
-    if data_args.dataset_split_name:
+    if _is_save_to_disk_dir(data_args.dataset_name):
+        raw_datasets = load_from_disk(data_args.dataset_name)
+        if data_args.dataset_split_name:
+            raw_datasets = DatasetDict({
+                split: raw_datasets[split]
+                for split in data_args.dataset_split_name.split("+")
+            })
+    elif data_args.dataset_split_name:
         raw_datasets = DatasetDict()
         for split in data_args.dataset_split_name.split("+"):
             raw_datasets[split] = load_dataset(

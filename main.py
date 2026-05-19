@@ -1,4 +1,5 @@
-from datasets import load_dataset, Audio
+import os
+from datasets import load_dataset, load_from_disk, Audio
 from multiprocess import set_start_method
 from dataspeech import rate_apply, pitch_apply, snr_apply, squim_apply
 import torch
@@ -28,8 +29,17 @@ if __name__ == "__main__":
 
 
     args = parser.parse_args()
-    
-    if args.configuration:
+
+    # If `dataset_name` points at a directory produced by `DatasetDict.save_to_disk`,
+    # use load_from_disk so the script works offline (e.g. on Leonardo compute nodes).
+    # Only DatasetDict (not bare Dataset) is supported: downstream code assumes splits.
+    is_local_save = (
+        os.path.isdir(args.dataset_name)
+        and os.path.isfile(os.path.join(args.dataset_name, "dataset_dict.json"))
+    )
+    if is_local_save:
+        dataset = load_from_disk(args.dataset_name)
+    elif args.configuration:
         dataset = load_dataset(args.dataset_name, args.configuration, num_proc=args.cpu_num_workers,)
     else:
         dataset = load_dataset(args.dataset_name, num_proc=args.cpu_num_workers,)

@@ -5,3 +5,9 @@ wip_scripts/*
 plots/*
 .vscode/*
 tmp_*/*
+
+# Leonardo HPC artifacts kept out of version control
+.conda/
+cache/
+leonardo/logs/*
+!leonardo/logs/.gitkeep

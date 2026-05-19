@@ -12,7 +12,7 @@ import numpy as np
 import torch
 from accelerate import Accelerator, skip_first_batches
 from accelerate.logging import get_logger
-from datasets import DatasetDict, load_dataset
+from datasets import DatasetDict, load_dataset, load_from_disk
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import (
@@ -446,7 +446,21 @@ def main():
 
     # 3. Load annotated dataset
     logger.info("*** Load annotated dataset ***")
-    if data_args.dataset_split_name is not None:
+    # Only DatasetDict (not bare Dataset) is supported as a local path: the
+    # downstream code iterates over named splits.
+    _local_save = (
+        os.path.isdir(data_args.dataset_name)
+        and os.path.isfile(os.path.join(data_args.dataset_name, "dataset_dict.json"))
+    )
+    if _local_save:
+        with accelerator.local_main_process_first():
+            raw_datasets = load_from_disk(data_args.dataset_name)
+        if data_args.dataset_split_name is not None:
+            raw_datasets = DatasetDict({
+                split: raw_datasets[split]
+                for split in data_args.dataset_split_name.split("+")
+            })
+    elif data_args.dataset_split_name is not None:
         raw_datasets = DatasetDict()
         data_splits = data_args.dataset_split_name.split("+")
         # load on a split-wise basis

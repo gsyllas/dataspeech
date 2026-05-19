@@ -1,12 +1,25 @@
 import numpy as np
 import pandas as pd
-from datasets import load_dataset, DatasetDict
+from datasets import load_dataset, load_from_disk, DatasetDict
 from multiprocess import set_start_method
 import argparse
 from pathlib import Path
 import os
 import matplotlib.pyplot as plt
 import json
+
+
+def _load_local_or_hub(name, config=None, num_proc=1):
+    """Load either a hub dataset name or a local `DatasetDict.save_to_disk` directory.
+
+    Only DatasetDict (not bare Dataset) is supported for local paths: the
+    downstream binning code iterates over `dataset[split]`.
+    """
+    if os.path.isdir(name) and os.path.isfile(os.path.join(name, "dataset_dict.json")):
+        return load_from_disk(name)
+    if config:
+        return load_dataset(name, config, num_proc=num_proc)
+    return load_dataset(name, num_proc=num_proc)
 
 SPEAKER_RATE_BINS = ["very slowly", "quite slowly", "slightly slowly", "moderate speed", "slightly fast", "quite fast", "very fast"]
 SNR_BINS = ["very noisy", "quite noisy", "slightly noisy", "moderate ambient sound", "slightly clear", "quite clear", "very clear"]
@@ -234,10 +247,10 @@ if __name__ == "__main__":
             
             dataset = []
             for dataset_name, dataset_config in zip(dataset_names, dataset_configs):
-                tmp_dataset = load_dataset(dataset_name, dataset_config, num_proc=args.cpu_num_workers)
+                tmp_dataset = _load_local_or_hub(dataset_name, dataset_config, num_proc=args.cpu_num_workers)
                 dataset.append(tmp_dataset)
         else:
-            dataset = [load_dataset(args.dataset_name, args.configuration, num_proc=args.cpu_num_workers)]
+            dataset = [_load_local_or_hub(args.dataset_name, args.configuration, num_proc=args.cpu_num_workers)]
             dataset_configs = [args.configuration]
     else:
         if "+" in args.dataset_name:
@@ -253,12 +266,12 @@ if __name__ == "__main__":
                     raise ValueError(f"There are {len(dataset_names)} datasets spotted but {len(output_dirs)} local paths on which to save the datasets spotted")
             
             dataset = []
-            for dataset_name, dataset_config in zip(dataset_names):
-                tmp_dataset = load_dataset(dataset_name, num_proc=args.cpu_num_workers)
+            for dataset_name in dataset_names:
+                tmp_dataset = _load_local_or_hub(dataset_name, num_proc=args.cpu_num_workers)
                 dataset.append(tmp_dataset)
 
         else:
-            dataset = [load_dataset(args.dataset_name, num_proc=args.cpu_num_workers)]
+            dataset = [_load_local_or_hub(args.dataset_name, num_proc=args.cpu_num_workers)]
 
     if args.plot_directory:
         Path(args.plot_directory).mkdir(parents=True, exist_ok=True)
