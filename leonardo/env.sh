@@ -33,6 +33,9 @@ export HF_DATASETS_CACHE="$HF_HOME/datasets"
 export TORCH_HOME="${TORCH_HOME:-$CACHE_ROOT/torch}"
 export PENN_CACHE="${PENN_CACHE:-$CACHE_ROOT/penn}"
 export PIP_CACHE_DIR="${PIP_CACHE_DIR:-$CACHE_ROOT/pip}"
+# Keep conda's package + env metadata caches in the repo too (don't pollute $HOME).
+export CONDA_PKGS_DIRS="${CONDA_PKGS_DIRS:-$REPO_ROOT/.conda/pkgs}"
+export CONDA_ENVS_PATH="${CONDA_ENVS_PATH:-$REPO_ROOT/.conda/envs}"
 
 # Where the user's two source datasets live (CSV + wavs/ subfolder each).
 export DATA_ROOT="${DATA_ROOT:-/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts}"
