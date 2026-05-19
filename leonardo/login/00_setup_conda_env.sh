@@ -82,25 +82,39 @@ fi
 # ---- 4. pip dependencies ----------------------------------------------------
 # Pin torch to a CUDA-12 wheel that matches `module load cuda/12.2` on compute
 # nodes. cu121 wheels are forward compatible with cu122 runtimes.
-# Pinned to 2.2.2 because brouhaha-vad requires pyannote.audio<3.3.1, and
-# pyannote.audio 3.x references torchaudio.AudioMetaData which was removed in
-# torchaudio 2.3.
-echo "[setup] installing pytorch (cu121 wheels, 2.2.2 for pyannote compatibility)"
+PIP_CONSTRAINT_FILE="$HERE/pip-constraints.txt"
+TORCH_VERSION="2.3.1"
+BITSANDBYTES_VERSION="0.43.1"
+
+echo "[setup] installing pytorch (cu121 wheels, pinned by $PIP_CONSTRAINT_FILE)"
 pip install --upgrade pip
 pip install --index-url https://download.pytorch.org/whl/cu121 \
-  "torch==2.2.2" "torchaudio==2.2.2"
+  "torch==$TORCH_VERSION" "torchaudio==$TORCH_VERSION"
 
 # bitsandbytes for 4-bit LLM loading on A100.
 echo "[setup] installing dataspeech requirements + bitsandbytes"
-pip install -r "$REPO_ROOT/requirements.txt"
-pip install "bitsandbytes>=0.43.1" "accelerate>=0.30" "soundfile" "pandas"
+pip install -c "$PIP_CONSTRAINT_FILE" -r "$REPO_ROOT/requirements.txt"
+pip install -c "$PIP_CONSTRAINT_FILE" \
+  "bitsandbytes==$BITSANDBYTES_VERSION" "accelerate>=0.30" "soundfile" "pandas"
+pip check
 
 # Sanity check: GPU-side imports should at least be importable on a login node
 # (they'll fail to actually run kernels without a GPU, which is fine here).
 echo "[setup] checking espeak-ng on PATH:"
 command -v espeak-ng || { echo "[setup] espeak-ng binary not found in env" >&2; exit 1; }
 python - <<'PY'
+import numpy
+if int(numpy.__version__.split(".")[0]) >= 2:
+    raise RuntimeError(
+        f"numpy {numpy.__version__} >= 2.0; torch 2.3 was compiled against "
+        "numpy 1.x. Check pip-constraints.txt and reinstall numpy."
+    )
 import torch, torchaudio, transformers, datasets, accelerate, penn, phonemizer
+if not hasattr(torchaudio, "AudioMetaData"):
+    raise RuntimeError(
+        f"torchaudio {torchaudio.__version__} does not expose AudioMetaData; "
+        "rerun setup so the pinned torch/torchaudio stack is restored."
+    )
 import pyannote.audio  # noqa
 import brouhaha       # noqa
 from phonemizer.backend import EspeakBackend

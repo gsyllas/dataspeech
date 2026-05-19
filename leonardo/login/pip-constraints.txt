@@ -1,0 +1,17 @@
+# Keep the Leonardo env on a known-compatible audio/CUDA stack.
+#
+# pyannote.audio 3.x imports torchaudio.AudioMetaData. That API exists in the
+# 2.3.x stack used here, while newer torchaudio releases have moved audio I/O
+# toward TorchCodec and can break the import.
+torch==2.3.1
+torchaudio==2.3.1
+pyannote.audio==3.3.0
+
+# Current bitsandbytes releases require newer torch versions. 0.43.1 is the
+# version this setup originally targeted for 4-bit loading on A100.
+bitsandbytes==0.43.1
+
+# torch <= 2.3 was compiled against NumPy 1.x and raises
+# "module compiled using NumPy 1.x cannot be run in NumPy 2.x" at import time
+# if pip pulls in numpy 2.x via any transitive dep (transformers, datasets, etc.).
+numpy<2
