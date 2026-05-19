@@ -39,27 +39,47 @@ source "$MINIFORGE_DIR/etc/profile.d/conda.sh"
 export CONDARC=/dev/null
 
 # ---- 2. env -----------------------------------------------------------------
+# We don't install espeak-ng from conda — Leonardo's solver refused it.
+# Instead we install build tools and build espeak-ng from source into the env
+# in step 3. Pure-Python deps come in step 4.
 if [ ! -d "$CONDA_ENV_PREFIX" ] || [ ! -x "$CONDA_ENV_PREFIX/bin/python" ]; then
   echo "[setup] creating env at $CONDA_ENV_PREFIX"
-  # Python 3.10: known good with pyannote.audio + brouhaha-vad + penn.
-  # espeak-ng pulled from conda-forge so phonemizer works without sudo.
-  # --override-channels guarantees we ignore any inherited channel config.
   "$MINIFORGE_DIR/bin/conda" create -y -p "$CONDA_ENV_PREFIX" \
-    --override-channels -c conda-forge -c nvidia \
+    --override-channels -c conda-forge \
     python=3.10 \
-    espeak-ng \
-    libsndfile \
-    sox \
-    ffmpeg \
-    pip \
-    git
+    libsndfile sox ffmpeg \
+    gcc_linux-64 gxx_linux-64 make \
+    autoconf automake libtool pkg-config \
+    pip git
 else
   echo "[setup] env already exists at $CONDA_ENV_PREFIX (reusing)"
 fi
 
 conda activate "$CONDA_ENV_PREFIX"
 
-# ---- 3. pip dependencies ----------------------------------------------------
+# ---- 3. build espeak-ng from source into env prefix ------------------------
+ESPEAK_NG_VERSION="${ESPEAK_NG_VERSION:-1.52.0}"
+ESPEAK_NG_SRC="$REPO_ROOT/.conda/build/espeak-ng"
+if [ ! -x "$CONDA_ENV_PREFIX/bin/espeak-ng" ]; then
+  echo "[setup] building espeak-ng $ESPEAK_NG_VERSION from source"
+  mkdir -p "$(dirname "$ESPEAK_NG_SRC")"
+  if [ ! -d "$ESPEAK_NG_SRC/.git" ]; then
+    git clone --depth 1 --branch "$ESPEAK_NG_VERSION" \
+      https://github.com/espeak-ng/espeak-ng.git "$ESPEAK_NG_SRC"
+  fi
+  pushd "$ESPEAK_NG_SRC" >/dev/null
+  ./autogen.sh
+  # --without-pcaudiolib: we only need phoneme output, no audio playback,
+  # so don't drag in alsa/pulse/etc. and avoid optional-dep failures.
+  ./configure --prefix="$CONDA_ENV_PREFIX" --without-pcaudiolib
+  make -j 4
+  make install
+  popd >/dev/null
+else
+  echo "[setup] espeak-ng already built at $CONDA_ENV_PREFIX/bin/espeak-ng"
+fi
+
+# ---- 4. pip dependencies ----------------------------------------------------
 # Pin torch to a CUDA-12 wheel that matches `module load cuda/12.2` on compute
 # nodes. cu121 wheels are forward compatible with cu122 runtimes.
 echo "[setup] installing pytorch (cu121 wheels)"
