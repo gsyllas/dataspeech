@@ -82,10 +82,13 @@ fi
 # ---- 4. pip dependencies ----------------------------------------------------
 # Pin torch to a CUDA-12 wheel that matches `module load cuda/12.2` on compute
 # nodes. cu121 wheels are forward compatible with cu122 runtimes.
-echo "[setup] installing pytorch (cu121 wheels)"
+# Pinned to 2.2.2 because brouhaha-vad requires pyannote.audio<3.3.1, and
+# pyannote.audio 3.x references torchaudio.AudioMetaData which was removed in
+# torchaudio 2.3.
+echo "[setup] installing pytorch (cu121 wheels, 2.2.2 for pyannote compatibility)"
 pip install --upgrade pip
 pip install --index-url https://download.pytorch.org/whl/cu121 \
-  "torch==2.3.1" "torchaudio==2.3.1"
+  "torch==2.2.2" "torchaudio==2.2.2"
 
 # bitsandbytes for 4-bit LLM loading on A100.
 echo "[setup] installing dataspeech requirements + bitsandbytes"
