@@ -1,10 +1,10 @@
 # Keep the Leonardo env on a known-compatible audio/CUDA stack.
 #
-# pyannote.audio 3.x imports torchaudio.AudioMetaData. That API exists in the
-# 2.3.x stack used here, while newer torchaudio releases have moved audio I/O
-# toward TorchCodec and can break the import.
-torch==2.3.1
-torchaudio==2.3.1
+# pyannote.audio 3.x imports torchaudio.AudioMetaData, which still exists in
+# torchaudio 2.4.x but was removed in 2.9. transformers 5.x floors torch at
+# 2.4, so 2.4.1 is the version that satisfies BOTH bounds.
+torch==2.4.1
+torchaudio==2.4.1
 pyannote.audio==3.3.0
 
 # Current bitsandbytes releases require newer torch versions. 0.43.1 is the
