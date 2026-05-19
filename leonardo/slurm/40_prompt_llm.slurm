@@ -36,6 +36,7 @@ echo "[llm] output:   $OUT_DIR"
 echo "[llm] model:    $LLM_MODEL_ID"
 echo "[llm] compile:  $LLM_TORCH_COMPILE"
 echo "[llm] trust remote code: $LLM_TRUST_REMOTE_CODE"
+echo "[llm] use HF token: $LLM_USE_HF_TOKEN"
 nvidia-smi -L || true
 
 if [ ! -d "$IN_DIR" ]; then
@@ -49,6 +50,10 @@ case "${LLM_TORCH_COMPILE,,}" in
 esac
 case "${LLM_TRUST_REMOTE_CODE,,}" in
   1|true|yes|on) MODEL_EXTRA_ARGS+=(--trust_remote_code) ;;
+esac
+case "${LLM_USE_HF_TOKEN,,}" in
+  1|true|yes|on) MODEL_EXTRA_ARGS+=(--token true) ;;
+  *) MODEL_EXTRA_ARGS+=(--token false) ;;
 esac
 
 # A100 64GB fits Llama-3.1-8B-Instruct in bf16 with batch=64; no need for 4-bit.
