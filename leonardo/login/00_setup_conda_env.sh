@@ -85,27 +85,18 @@ fi
 # on Leonardo compute nodes.
 PIP_CONSTRAINT_FILE="$HERE/pip-constraints.txt"
 # torch/torchaudio 2.5.1: highest cu121 wheel PyTorch publishes, and still
-# exposes pyannote.audio.AudioMetaData. torbi is built from source against this
-# exact torch below; otherwise pip build isolation may compile it against a
-# different torch and fail at import time.
+# exposes pyannote.audio.AudioMetaData. penn is pinned below to 0.0.14 because
+# penn 1.0.0 added a compiled torbi dependency whose Linux wheels are not
+# compatible with Leonardo's older glibc/toolchain stack.
 # See pip-constraints.txt for the full reasoning.
 TORCH_VERSION="2.5.1"
-TORBI_VERSION="1.3.3"
 BITSANDBYTES_VERSION="0.43.1"
 
 echo "[setup] installing pytorch (cu121 wheels, pinned by $PIP_CONSTRAINT_FILE)"
 pip install --upgrade pip
 pip install --index-url https://download.pytorch.org/whl/cu121 \
   "torch==$TORCH_VERSION" "torchaudio==$TORCH_VERSION"
-
-# torbi 1.4.0 only has a manylinux_2_34 Linux wheel, which is too new for
-# Leonardo's login nodes. Build the latest source release that still ships an
-# sdist, and disable build isolation so the extension compiles against the
-# torch wheel already installed in this env.
-echo "[setup] building torbi from source against pinned torch"
-pip install -c "$PIP_CONSTRAINT_FILE" "setuptools>=61,<70" wheel numpy
-pip install -c "$PIP_CONSTRAINT_FILE" --no-build-isolation --no-binary torbi \
-  "torbi==$TORBI_VERSION"
+pip uninstall -y torbi >/dev/null 2>&1 || true
 
 # bitsandbytes for 4-bit LLM loading on A100.
 echo "[setup] installing dataspeech requirements + bitsandbytes"
