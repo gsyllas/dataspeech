@@ -80,13 +80,15 @@ else
 fi
 
 # ---- 4. pip dependencies ----------------------------------------------------
-# Pin torch to a CUDA-12 wheel that matches `module load cuda/12.2` on compute
-# nodes. cu121 wheels are forward compatible with cu122 runtimes.
+# Pin torch to the newest CUDA-12.1 wheel available for this stack. cu121
+# wheels are forward compatible with the `module load cuda/12.2` runtime used
+# on Leonardo compute nodes.
 PIP_CONSTRAINT_FILE="$HERE/pip-constraints.txt"
-# torch/torchaudio 2.4.1: highest version where pyannote.audio.AudioMetaData
-# still exists, and minimum that torbi (transitive dep of penn) supports.
+# torch/torchaudio 2.5.1: highest cu121 wheel PyTorch publishes, still exposes
+# pyannote.audio.AudioMetaData, and contains the operator-tag ABI required by
+# the current torbi wheel (transitive dep of penn).
 # See pip-constraints.txt for the full reasoning.
-TORCH_VERSION="2.4.1"
+TORCH_VERSION="2.5.1"
 BITSANDBYTES_VERSION="0.43.1"
 
 echo "[setup] installing pytorch (cu121 wheels, pinned by $PIP_CONSTRAINT_FILE)"
@@ -109,7 +111,7 @@ python - <<'PY'
 import numpy
 if int(numpy.__version__.split(".")[0]) >= 2:
     raise RuntimeError(
-        f"numpy {numpy.__version__} >= 2.0; torch 2.3 was compiled against "
+        f"numpy {numpy.__version__} >= 2.0; this pinned torch/audio stack expects "
         "numpy 1.x. Check pip-constraints.txt and reinstall numpy."
     )
 import torch, torchaudio, transformers, datasets, accelerate, penn, phonemizer
