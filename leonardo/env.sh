@@ -24,15 +24,31 @@ export REPO_ROOT
 export CONDA_ENV_PREFIX="${CONDA_ENV_PREFIX:-$REPO_ROOT/.conda/dataspeech}"
 
 # All HF / torch / penn caches live next to the repo on /leonardo_work.
+# Some login-node shells already export HF_HOME / TORCH_HOME from old projects;
+# ignore those inherited values so this pipeline does not fill the wrong quota.
+# To intentionally move every cache, set CACHE_ROOT before sourcing env.sh.
 export CACHE_ROOT="${CACHE_ROOT:-$REPO_ROOT/cache}"
-export HF_HOME="${HF_HOME:-$CACHE_ROOT/hf}"
+_dataspeech_note_ignored_cache_var() {
+  local name="$1"
+  local value="${!name:-}"
+  local expected="$2"
+  if [ -n "$value" ] && [ "$value" != "$expected" ]; then
+    echo "[env.sh] ignoring inherited $name=$value; using $expected" >&2
+  fi
+}
+_dataspeech_note_ignored_cache_var HF_HOME "$CACHE_ROOT/hf"
+_dataspeech_note_ignored_cache_var TORCH_HOME "$CACHE_ROOT/torch"
+_dataspeech_note_ignored_cache_var PENN_CACHE "$CACHE_ROOT/penn"
+_dataspeech_note_ignored_cache_var PIP_CACHE_DIR "$CACHE_ROOT/pip"
+export HF_HOME="$CACHE_ROOT/hf"
 export HF_HUB_CACHE="$HF_HOME"
 export HUGGINGFACE_HUB_CACHE="$HF_HOME"
 export TRANSFORMERS_CACHE="$HF_HOME"
 export HF_DATASETS_CACHE="$HF_HOME/datasets"
-export TORCH_HOME="${TORCH_HOME:-$CACHE_ROOT/torch}"
-export PENN_CACHE="${PENN_CACHE:-$CACHE_ROOT/penn}"
-export PIP_CACHE_DIR="${PIP_CACHE_DIR:-$CACHE_ROOT/pip}"
+export TORCH_HOME="$CACHE_ROOT/torch"
+export PENN_CACHE="$CACHE_ROOT/penn"
+export PIP_CACHE_DIR="$CACHE_ROOT/pip"
+unset -f _dataspeech_note_ignored_cache_var
 # Keep conda's package + env metadata caches in the repo too (don't pollute $HOME).
 export CONDA_PKGS_DIRS="${CONDA_PKGS_DIRS:-$REPO_ROOT/.conda/pkgs}"
 export CONDA_ENVS_PATH="${CONDA_ENVS_PATH:-$REPO_ROOT/.conda/envs}"
