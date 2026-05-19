@@ -118,6 +118,8 @@ PY
 Edit `leonardo/env.sh` or override on the command line:
 
 - `LLM_MODEL_ID` — change LLM (default `meta-llama/Meta-Llama-3.1-8B-Instruct`).
+- `LLM_TORCH_COMPILE` — set `0` for non-Llama/Gemma models such as Qwen or Mistral.
+- `LLM_TRUST_REMOTE_CODE` — set `1` only for models that require custom Hub code.
 - `LLM_EVAL_BATCH_SIZE` — bump to 96+ if VRAM allows; 64 is conservative.
 - `CPU_NUM_WORKERS` / `PREPROC_WORKERS` — boost node has 32 cores, default 8.
 - `DATA_ROOT`, `FEMALE_DIR`, `MALE_DIR` — point elsewhere if data moves.

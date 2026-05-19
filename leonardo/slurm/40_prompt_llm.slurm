@@ -34,12 +34,22 @@ echo "[llm] dataset:  $DATASET"
 echo "[llm] input:    $IN_DIR"
 echo "[llm] output:   $OUT_DIR"
 echo "[llm] model:    $LLM_MODEL_ID"
+echo "[llm] compile:  $LLM_TORCH_COMPILE"
+echo "[llm] trust remote code: $LLM_TRUST_REMOTE_CODE"
 nvidia-smi -L || true
 
 if [ ! -d "$IN_DIR" ]; then
   echo "[llm] missing text-tags input at $IN_DIR" >&2
   exit 1
 fi
+
+MODEL_EXTRA_ARGS=()
+case "${LLM_TORCH_COMPILE,,}" in
+  1|true|yes|on) MODEL_EXTRA_ARGS+=(--torch_compile) ;;
+esac
+case "${LLM_TRUST_REMOTE_CODE,,}" in
+  1|true|yes|on) MODEL_EXTRA_ARGS+=(--trust_remote_code) ;;
+esac
 
 # A100 64GB fits Llama-3.1-8B-Instruct in bf16 with batch=64; no need for 4-bit.
 # Pass speaker_id_column so the script knows the dataset has multiple speakers;
@@ -54,7 +64,7 @@ accelerate launch --num_processes=1 \
   --model_name_or_path "$LLM_MODEL_ID" \
   --torch_dtype "bfloat16" \
   --attn_implementation "sdpa" \
-  --torch_compile \
+  "${MODEL_EXTRA_ARGS[@]}" \
   --per_device_eval_batch_size "$LLM_EVAL_BATCH_SIZE" \
   --dataloader_num_workers 4 \
   --preprocessing_num_workers "$PREPROC_WORKERS" \
