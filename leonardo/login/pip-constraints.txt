@@ -1,14 +1,16 @@
 # Keep the Leonardo env on a known-compatible audio/CUDA stack.
 #
-# pyannote.audio 3.x imports torchaudio.AudioMetaData, which exists in
-# torchaudio 2.3.x but was removed in 2.9.
-torch==2.3.1
-torchaudio==2.3.1
+# Constraints (lowest common denominator):
+#   * pyannote.audio 3.x needs torchaudio.AudioMetaData (present in 2.3-2.8,
+#     removed in 2.9).
+#   * torbi (transitive dep of `penn`) needs torch >= 2.4 — uses symbols in
+#     c10::headeronly::Tag that didn't exist before 2.4.
+#   * transformers 5.x needs torch >= 2.4 too but is brand new; pin to v4.x
+#     since we only use standard AutoModel/AutoTokenizer APIs.
+# => torch 2.4.1 is the version that satisfies all three.
+torch==2.4.1
+torchaudio==2.4.1
 pyannote.audio==3.3.0
-
-# transformers 5.x (released Nov 2025) floors torch at 2.4. We only use
-# standard AutoModel/AutoTokenizer APIs that are stable in v4.x, so pin <5
-# instead of chasing the torch floor every time HF releases a major.
 transformers>=4.45,<5
 
 # Current bitsandbytes releases require newer torch versions. 0.43.1 is the

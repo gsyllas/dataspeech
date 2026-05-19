@@ -83,9 +83,10 @@ fi
 # Pin torch to a CUDA-12 wheel that matches `module load cuda/12.2` on compute
 # nodes. cu121 wheels are forward compatible with cu122 runtimes.
 PIP_CONSTRAINT_FILE="$HERE/pip-constraints.txt"
-# torch/torchaudio 2.3.1: latest in pyannote.audio's AudioMetaData window
-# that doesn't force transformers 5.x. See pip-constraints.txt.
-TORCH_VERSION="2.3.1"
+# torch/torchaudio 2.4.1: highest version where pyannote.audio.AudioMetaData
+# still exists, and minimum that torbi (transitive dep of penn) supports.
+# See pip-constraints.txt for the full reasoning.
+TORCH_VERSION="2.4.1"
 BITSANDBYTES_VERSION="0.43.1"
 
 echo "[setup] installing pytorch (cu121 wheels, pinned by $PIP_CONSTRAINT_FILE)"
