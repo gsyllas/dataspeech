@@ -577,9 +577,11 @@ def main():
         elif is_new_speaker_prompt:
             sample_prompt = NEW_PROMPT
         for key in EXPECTED_COLUMNS:
-            sample_prompt = sample_prompt.replace(f"[{key}]", sample[key])
+            placeholder = f"[{key}]"
+            if placeholder in sample_prompt:
+                sample_prompt = sample_prompt.replace(placeholder, str(sample[key]))
         if accent_column_name is not None and sample.get(accent_column_name, "Unindentified") != "Unindentified":
-            sample_prompt = sample_prompt.replace("[accent]", sample["accent"])
+            sample_prompt = sample_prompt.replace("[accent]", str(sample["accent"]))
             
         sample_prompt = [{"role": "user", "content": sample_prompt}]
         token_ids = tokenizer.apply_chat_template(sample_prompt)
