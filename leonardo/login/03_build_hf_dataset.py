@@ -189,42 +189,21 @@ def _assign_speaker_names(eligible: dict) -> dict:
     return assigned
 
 
-def _filter_multi_speaker_df(df, src: Path, min_hours: float, speaker_names_json: str | None):
+def _multi_speaker_maps(src: Path, min_hours: float, speaker_names_json: str | None):
     eligible = _eligible_multi_speakers(src, min_hours)
     names_by_key = _assign_speaker_names(eligible)
-
     id_to_key = {str(info.get("speaker_id")): speaker_key for speaker_key, info in eligible.items()}
-    eligible_values = set(id_to_key) | set(eligible)
-    speaker_values = df["speaker_id"].astype(str)
-    before = len(df)
-    df = df[speaker_values.isin(eligible_values)].copy()
-    after = len(df)
-    if after == 0:
-        raise SystemExit(
-            "multi-speaker filter produced 0 rows; expected metadata speaker_id "
-            "to match either dataset_stats speaker_id values or per_speaker keys"
-        )
 
-    def speaker_key_for_value(value: object) -> str | None:
-        value = str(value)
-        return id_to_key.get(value, value if value in eligible else None)
-
-    key_by_observed_value = {
-        value: speaker_key_for_value(value)
-        for value in sorted(df["speaker_id"].astype(str).unique())
-    }
-    name_map = {
-        value: names_by_key[key]
-        for value, key in key_by_observed_value.items()
-        if key is not None
-    }
-    gender_map = {
-        value: _speaker_gender(key)
-        for value, key in key_by_observed_value.items()
-        if key is not None
-    }
-
-    df["gender"] = df["speaker_id"].astype(str).map(gender_map).fillna(df.get("gender", ""))
+    # Include both forms because the saved DatasetDict may store speaker_id as
+    # the numeric id (e.g. 5), while the stats JSON is keyed by names
+    # (e.g. cv_speaker_0). run_prompt_creation.py also stringifies speaker_id.
+    name_map = {}
+    gender_map = {}
+    for speaker_key, info in eligible.items():
+        values = {speaker_key, str(info.get("speaker_id"))}
+        for value in values:
+            name_map[value] = names_by_key[speaker_key]
+            gender_map[value] = _speaker_gender(speaker_key)
 
     if speaker_names_json:
         path = Path(speaker_names_json)
@@ -239,8 +218,71 @@ def _filter_multi_speaker_df(df, src: Path, min_hours: float, speaker_names_json
         for key, info in sorted(eligible.items(), key=lambda item: int(item[1].get("speaker_id", 10**9)))
     ]
     print(f"[build] multi: kept {len(eligible)} speakers >= {min_hours}h: {', '.join(kept_summary)}", flush=True)
+    return eligible, name_map, gender_map
+
+
+def _filter_multi_speaker_df(df, src: Path, min_hours: float, speaker_names_json: str | None):
+    _, name_map, gender_map = _multi_speaker_maps(src, min_hours, speaker_names_json)
+    eligible_values = set(name_map)
+    speaker_values = df["speaker_id"].astype(str)
+    before = len(df)
+    df = df[speaker_values.isin(eligible_values)].copy()
+    after = len(df)
+    if after == 0:
+        raise SystemExit(
+            "multi-speaker filter produced 0 rows; expected metadata speaker_id "
+            "to match either dataset_stats speaker_id values or per_speaker keys"
+        )
+
+    df["gender"] = df["speaker_id"].astype(str).map(gender_map).fillna(df.get("gender", ""))
     print(f"[build] multi: filtered {before} -> {after} rows", flush=True)
     return df
+
+
+def _build_multi_from_saved_dataset(src: Path, out_dir: Path, min_hours: float,
+                                    speaker_names_json: str | None) -> None:
+    from datasets import DatasetDict, load_from_disk
+
+    _, name_map, gender_map = _multi_speaker_maps(src, min_hours, speaker_names_json)
+    eligible_values = set(name_map)
+
+    print(f"[build] multi: loading saved dataset from {src}", flush=True)
+    raw = load_from_disk(str(src))
+    if not isinstance(raw, DatasetDict):
+        raw = DatasetDict({"train": raw})
+
+    processed = DatasetDict()
+    for split_name, ds in raw.items():
+        if "speaker_id" not in ds.column_names:
+            raise SystemExit(f"multi split {split_name!r} missing speaker_id column: {ds.column_names}")
+        if "text" not in ds.column_names and "transcription" in ds.column_names:
+            ds = ds.rename_column("transcription", "text")
+
+        before = len(ds)
+        ds = ds.filter(
+            lambda speaker_id: str(speaker_id) in eligible_values,
+            input_columns=["speaker_id"],
+        )
+        after = len(ds)
+        if after == 0:
+            raise SystemExit(
+                f"multi split {split_name!r} filter produced 0 rows; expected speaker_id "
+                "to match dataset_stats speaker_id values or per_speaker keys"
+            )
+
+        ds = ds.map(
+            lambda speaker_ids: {"gender": [gender_map.get(str(value), "") for value in speaker_ids]},
+            batched=True,
+            input_columns=["speaker_id"],
+        )
+        processed[split_name] = ds
+        print(f"[build] multi/{split_name}: filtered {before} -> {after} rows", flush=True)
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    print(f"[build] multi: writing to {out_dir}", flush=True)
+    processed.save_to_disk(str(out_dir))
+    print(f"[build] multi: done. Verify with `python -c \"from datasets import load_from_disk; "
+          f"print(load_from_disk('{out_dir}'))\"`", flush=True)
 
 
 def build(name: str, split: str = "train", multi_min_speaker_hours: float = 1.0,
@@ -258,6 +300,10 @@ def build(name: str, split: str = "train", multi_min_speaker_hours: float = 1.0,
     csv_path = src / csv_name
     wavs_dir = src / wavs_subdir
     out_dir = Path(out_root) / name / "01_hf_dataset"
+
+    if name == "multi" and (src / "dataset_dict.json").is_file():
+        _build_multi_from_saved_dataset(src, out_dir, multi_min_speaker_hours, speaker_names_json)
+        return
 
     if not csv_path.is_file():
         raise SystemExit(f"missing CSV: {csv_path}")
