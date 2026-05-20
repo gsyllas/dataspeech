@@ -57,11 +57,18 @@ export CONDA_ENVS_PATH="${CONDA_ENVS_PATH:-$REPO_ROOT/.conda/envs}"
 export DATA_ROOT="${DATA_ROOT:-/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts}"
 export FEMALE_DIR="${FEMALE_DIR:-$DATA_ROOT/female_normalized}"
 export MALE_DIR="${MALE_DIR:-$DATA_ROOT/male_normalized}"
+export MULTI_SPEAKER_DIR="${MULTI_SPEAKER_DIR:-$DATA_ROOT/multi_speaker_combined}"
 export METADATA_CSV_NAME="${METADATA_CSV_NAME:-metadata.csv}"
 export WAVS_SUBDIR="${WAVS_SUBDIR:-wavs}"
 
 # Per-dataset output root (one dir per dataset; all stages write here).
 export OUT_ROOT="${OUT_ROOT:-$DATA_ROOT/dataspeech_out}"
+export NAMED_OUT_ROOT="${NAMED_OUT_ROOT:-$DATA_ROOT/dataspeech_out_named}"
+export NAMED_FEMALE_SPEAKER_NAME="${NAMED_FEMALE_SPEAKER_NAME:-Eleni}"
+export NAMED_MALE_SPEAKER_NAME="${NAMED_MALE_SPEAKER_NAME:-Nikos}"
+export NAMED_MULTI_SPEAKER_NAMES_JSON="${NAMED_MULTI_SPEAKER_NAMES_JSON:-$REPO_ROOT/leonardo/config/multi_speaker_names.json}"
+export NAMED_SPEAKER_NAME_SEED="${NAMED_SPEAKER_NAME_SEED:-1337}"
+export MULTI_MIN_SPEAKER_HOURS="${MULTI_MIN_SPEAKER_HOURS:-1.0}"
 
 # ---- pipeline parameters --------------------------------------------------
 # LLM for run_prompt_creation.py (A100 64GB -> fp16 fits Llama-3.1-8B-Instruct).
@@ -86,7 +93,8 @@ dataset_dir_for() {
   case "${1:-}" in
     female) echo "$FEMALE_DIR" ;;
     male)   echo "$MALE_DIR" ;;
-    *) echo "[env.sh] unknown DATASET='${1:-}'; expected 'female' or 'male'" >&2; return 1 ;;
+    multi)  echo "$MULTI_SPEAKER_DIR" ;;
+    *) echo "[env.sh] unknown DATASET='${1:-}'; expected 'female', 'male', or 'multi'" >&2; return 1 ;;
   esac
 }
 

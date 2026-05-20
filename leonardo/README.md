@@ -88,6 +88,38 @@ Stage 30 (deterministic) and stage 40 (LLM) both depend on stage 20 and
 run **in parallel** after it finishes. Stage 40 is the long one; stage
 30 typically finishes in minutes.
 
+## Named-speaker variant
+
+The default pipeline above keeps prompts anonymous and gender-aware. To build
+a separate named-speaker version, use the named output root. This does not
+overwrite `$OUT_ROOT`. The named variant uses only `multi_speaker_combined`,
+because it already contains the standalone female/male speakers plus the
+additional multi-speaker data.
+
+```bash
+source leonardo/env.sh
+activate_conda_env
+
+# Builds filtered multi into $NAMED_OUT_ROOT.
+# It keeps speakers with >= $MULTI_MIN_SPEAKER_HOURS hours and writes
+# $NAMED_MULTI_SPEAKER_NAMES_JSON.
+bash leonardo/login/04_prepare_named_variant.sh
+
+export LLM_MODEL_ID="Qwen/Qwen2.5-7B-Instruct"
+export LLM_TORCH_COMPILE=0
+export LLM_USE_HF_TOKEN=0
+bash leonardo/slurm/submit_named.sh
+```
+
+Defaults:
+
+- `female` inside the multi-speaker source uses `$NAMED_FEMALE_SPEAKER_NAME` (`Eleni`).
+- `male` inside the multi-speaker source uses `$NAMED_MALE_SPEAKER_NAME` (`Nikos`).
+- multi-speaker prompts use `$NAMED_MULTI_SPEAKER_NAMES_JSON`.
+- multi filtering uses `$MULTI_MIN_SPEAKER_HOURS` (`1.0`).
+- generated multi names are unique; `female` and `cs10*` speakers receive
+  female names, while `male`, `male3h*`, and `cv_speaker_*` receive male names.
+
 ## Outputs
 
 Each stage writes to `$OUT_ROOT/<dataset>/<stage>/` as a
@@ -122,6 +154,10 @@ Edit `leonardo/env.sh` or override on the command line:
 - `LLM_TRUST_REMOTE_CODE` — set `1` only for models that require custom Hub code.
 - `LLM_USE_HF_TOKEN` — set `1` for gated/private models; keep `0` for public models.
 - `LLM_EVAL_BATCH_SIZE` — bump to 96+ if VRAM allows; 64 is conservative.
+- `NAMED_OUT_ROOT` — separate output root for named-speaker runs.
+- `NAMED_FEMALE_SPEAKER_NAME` / `NAMED_MALE_SPEAKER_NAME` — single-speaker names.
+- `NAMED_MULTI_SPEAKER_NAMES_JSON` — generated `speaker_id -> name` map for multi.
+- `MULTI_SPEAKER_DIR` / `MULTI_MIN_SPEAKER_HOURS` — source and threshold for multi.
 - `CPU_NUM_WORKERS` / `PREPROC_WORKERS` — boost node has 32 cores, default 8.
 - `DATA_ROOT`, `FEMALE_DIR`, `MALE_DIR` — point elsewhere if data moves.
 - `OUT_ROOT` — change where outputs land.

@@ -26,7 +26,7 @@ cd "$HERE_REPO"
 # shellcheck disable=SC1091
 source leonardo/env.sh
 
-: "${DATASET:?DATASET must be set to 'female' or 'male'}"
+: "${DATASET:?DATASET must be set to 'female', 'male', or 'multi'}"
 activate_conda_env
 set_offline_mode
 

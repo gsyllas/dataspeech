@@ -16,6 +16,7 @@
 # Submit with:
 #   DATASET=female sbatch leonardo/slurm/10_annotate.slurm
 #   DATASET=male   sbatch leonardo/slurm/10_annotate.slurm
+#   DATASET=multi  sbatch leonardo/slurm/10_annotate.slurm
 set -euo pipefail
 module purge
 module load cuda/12.2
@@ -26,7 +27,7 @@ cd "$HERE_REPO"
 # shellcheck disable=SC1091
 source leonardo/env.sh
 
-: "${DATASET:?DATASET must be set to 'female' or 'male'}"
+: "${DATASET:?DATASET must be set to 'female', 'male', or 'multi'}"
 activate_conda_env
 set_offline_mode
 
