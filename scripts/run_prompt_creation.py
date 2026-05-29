@@ -230,6 +230,13 @@ def get_kbit_device_map() -> Union[Dict[str, int], None]:
 
 CHECKPOINT_PREFIX = "checkpoint"
 _RE_CHECKPOINT = re.compile(r"^checkpoint-(\d+).json$")
+_DESCRIPTION_START_PATTERNS = (
+    re.compile(r"\bA\s+(?:female|male|woman|man|speaker)\b", re.IGNORECASE),
+    re.compile(r"\bAn\s+(?:adult\s+)?(?:female|male|woman|man|speaker)\b", re.IGNORECASE),
+    re.compile(r"\bThe\s+(?:speaker|recording|voice|audio)\b", re.IGNORECASE),
+    re.compile(r"\bIn\s+(?:a|an)\s+", re.IGNORECASE),
+    re.compile(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\s+(?:speaks|delivers|has|sounds)\b"),
+)
 
 
 def save_checkpoint(output_dir, all_generated_ids, step):
@@ -299,6 +306,38 @@ def get_last_checkpoint(folder, return_list=False) -> Tuple[List, int]:
         return all_generated_ids, cur_step
     else:
         return [], cur_step
+
+
+def clean_generated_description(text: str) -> str:
+    """Remove small prompt/chat-template remnants before an LLM description."""
+    if text is None:
+        return ""
+
+    text = str(text).replace("\x00", "").strip()
+    text = re.sub(r"<\|/?(?:assistant|user|system|im_start|im_end)\|>", " ", text)
+    text = re.sub(r"^(?:assistant|response|answer)\s*[:\-]\s*", "", text, flags=re.IGNORECASE)
+
+    lines = [line.strip(" \t\r\n\"'`") for line in text.splitlines() if line.strip()]
+    while len(lines) > 1 and len(lines[0]) <= 24:
+        first = lines[0].lstrip(":-,.;!?\"'` ")
+        if any(pattern.search(first) and pattern.search(first).start() == 0 for pattern in _DESCRIPTION_START_PATTERNS):
+            break
+        lines.pop(0)
+    text = " ".join(lines) if lines else text
+
+    earliest = None
+    for pattern in _DESCRIPTION_START_PATTERNS:
+        match = pattern.search(text)
+        if match and (earliest is None or match.start() < earliest):
+            earliest = match.start()
+
+    if earliest and earliest > 0:
+        prefix = text[:earliest]
+        if "\n" in prefix or len(prefix) <= 80 or not re.search(r"[A-Za-z]{3,}", prefix):
+            text = text[earliest:]
+
+    text = re.sub(r"\s+", " ", text).strip(" \t\r\n\"'`")
+    return text
 
 
 @dataclass
@@ -605,14 +644,23 @@ def main():
             temperature=model_args.temperature,
             max_new_tokens=model_args.max_new_tokens,
         )
+        output_ids = output_ids[:, batch["input_ids"].shape[1] :]
         output_ids = accelerator.pad_across_processes(output_ids, dim=1, pad_index=tokenizer.pad_token_id)
         return output_ids
 
     def postprocess_dataset(batch):
         prompt_texts = tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=True)
         generated_texts = tokenizer.batch_decode(batch["generated_ids"], skip_special_tokens=True)
-        
-        batch["text_description"] = [generated_text[len(prompt_text) :] for (prompt_text, generated_text) in zip(prompt_texts, generated_texts)]
+
+        # New checkpoints only contain generated tokens. The fallback keeps older
+        # full-sequence checkpoints readable if someone resumes without cleaning.
+        descriptions = []
+        for prompt_text, generated_text in zip(prompt_texts, generated_texts):
+            if generated_text.startswith(prompt_text):
+                generated_text = generated_text[len(prompt_text) :]
+            descriptions.append(clean_generated_description(generated_text))
+
+        batch["text_description"] = descriptions
         return batch
 
     for split in vectorized_datasets:
