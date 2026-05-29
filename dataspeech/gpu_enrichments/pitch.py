@@ -19,6 +19,32 @@ center = 'half-hop'
 # (Optional) Linearly interpolate unvoiced regions below periodicity threshold
 interp_unvoiced_at = .065
 
+# PENN reflect-pads internally by about 472 samples for this configuration.
+# Very short clips can be shorter than that after resampling, which makes
+# torch's reflect padding fail. Pad them with silence before handing off.
+min_penn_audio_samples = 1024
+
+
+def _prepare_waveform(sample):
+    waveform = torch.tensor(sample["array"]).float()
+    if waveform.ndim == 0:
+        waveform = waveform.reshape(1)
+    elif waveform.ndim == 2:
+        if waveform.shape[0] <= 2:
+            waveform = waveform.mean(dim=0)
+        else:
+            waveform = waveform.mean(dim=-1)
+
+    waveform = waveform.reshape(1, -1)
+    if waveform.shape[-1] < min_penn_audio_samples:
+        waveform = torch.nn.functional.pad(
+            waveform,
+            (0, min_penn_audio_samples - waveform.shape[-1]),
+            mode="constant",
+            value=0.0,
+        )
+    return waveform
+
 
 def pitch_apply(batch, rank=None, audio_column_name="audio", output_column_name="utterance_pitch", penn_batch_size=4096):
     if isinstance(batch[audio_column_name], list):  
@@ -27,7 +53,7 @@ def pitch_apply(batch, rank=None, audio_column_name="audio", output_column_name=
         for sample in batch[audio_column_name]:
             # Infer pitch and periodicity
             pitch, periodicity = penn.from_audio(
-                torch.tensor(sample["array"][None, :]).float(),
+                _prepare_waveform(sample),
                 sample["sampling_rate"],
                 hopsize=hopsize,
                 fmin=fmin,
@@ -47,7 +73,7 @@ def pitch_apply(batch, rank=None, audio_column_name="audio", output_column_name=
     else:
         sample = batch[audio_column_name]
         pitch, periodicity = penn.from_audio(
-                torch.tensor(sample["array"][None, :]).float(),
+                _prepare_waveform(sample),
                 sample["sampling_rate"],
                 hopsize=hopsize,
                 fmin=fmin,
