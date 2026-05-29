@@ -233,10 +233,21 @@ _RE_CHECKPOINT = re.compile(r"^checkpoint-(\d+).json$")
 _DESCRIPTION_START_PATTERNS = (
     re.compile(r"\bA\s+(?:female|male|woman|man|speaker)\b", re.IGNORECASE),
     re.compile(r"\bAn\s+(?:adult\s+)?(?:female|male|woman|man|speaker)\b", re.IGNORECASE),
+    re.compile(r"\bThe\s+(?:female|male|woman|man)\s+speaker\b", re.IGNORECASE),
     re.compile(r"\bThe\s+(?:speaker|recording|voice|audio)\b", re.IGNORECASE),
     re.compile(r"\bIn\s+(?:a|an)\s+", re.IGNORECASE),
-    re.compile(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\s+(?:speaks|delivers|has|sounds)\b"),
+    re.compile(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?(?:'s)?\s+(?:voice\s+is|speaks|delivers|has|sounds)\b"),
 )
+_DESCRIPTION_META_PREFIX = re.compile(
+    r"\b(?:answer|description|following|generated|idioma|proporcion|responder|respuesta|kuvaus|seuraava)\b",
+    re.IGNORECASE,
+)
+OUTPUT_CONTRACT = """Output rules:
+- Write in English only.
+- Return exactly one concise speech-description sentence, or at most two short sentences.
+- Start immediately with the description.
+- Do not mention the task, the prompt, language choice, translation, or missing information.
+- Do not include labels, explanations, quotes, markdown, bullet points, XML/HTML tags, code, or any text before or after the description."""
 
 
 def save_checkpoint(output_dir, all_generated_ids, step):
@@ -315,11 +326,12 @@ def clean_generated_description(text: str) -> str:
 
     text = str(text).replace("\x00", "").strip()
     text = re.sub(r"<\|/?(?:assistant|user|system|im_start|im_end)\|>", " ", text)
+    text = re.sub(r"</?\w+[^>]*>", " ", text)
     text = re.sub(r"^(?:assistant|response|answer)\s*[:\-]\s*", "", text, flags=re.IGNORECASE)
 
-    lines = [line.strip(" \t\r\n\"'`") for line in text.splitlines() if line.strip()]
+    lines = [line.strip(" \t\r\n\"'`:-,;!?%<>/=") for line in text.splitlines() if line.strip()]
     while len(lines) > 1 and len(lines[0]) <= 24:
-        first = lines[0].lstrip(":-,.;!?\"'` ")
+        first = lines[0].lstrip(":-,.;!?\"'`%<>/= ")
         if any(pattern.search(first) and pattern.search(first).start() == 0 for pattern in _DESCRIPTION_START_PATTERNS):
             break
         lines.pop(0)
@@ -333,11 +345,26 @@ def clean_generated_description(text: str) -> str:
 
     if earliest and earliest > 0:
         prefix = text[:earliest]
-        if "\n" in prefix or len(prefix) <= 80 or not re.search(r"[A-Za-z]{3,}", prefix):
+        if (
+            "\n" in prefix
+            or earliest <= 350
+            or _DESCRIPTION_META_PREFIX.search(prefix)
+            or not re.search(r"[A-Za-z]{3,}", prefix)
+        ):
             text = text[earliest:]
 
-    text = re.sub(r"\s+", " ", text).strip(" \t\r\n\"'`")
+    text = re.sub(r"\s+", " ", text).strip(" \t\r\n\"'`:-,;!?%<>/=")
     return text
+
+
+def add_output_contract(prompt: str) -> str:
+    if OUTPUT_CONTRACT in prompt:
+        return prompt
+
+    marker = "\nFor the keywords:"
+    if marker in prompt:
+        return prompt.replace(marker, f"\n{OUTPUT_CONTRACT}\n{marker}", 1)
+    return f"{prompt.rstrip()}\n\n{OUTPUT_CONTRACT}\n"
 
 
 @dataclass
@@ -615,6 +642,7 @@ def main():
             sample_prompt = NEW_PROMPT if sample.get(accent_column_name, "Unindentified") == "Unindentified" else NEW_PROMPT_WITH_ACCENT
         elif is_new_speaker_prompt:
             sample_prompt = NEW_PROMPT
+        sample_prompt = add_output_contract(sample_prompt)
         for key in EXPECTED_COLUMNS:
             placeholder = f"[{key}]"
             if placeholder in sample_prompt:

@@ -85,6 +85,9 @@ export LLM_MODEL_ID="${LLM_MODEL_ID:-meta-llama/Meta-Llama-3.1-8B-Instruct}"
 export LLM_TORCH_COMPILE="${LLM_TORCH_COMPILE:-1}"
 export LLM_TRUST_REMOTE_CODE="${LLM_TRUST_REMOTE_CODE:-0}"
 export LLM_USE_HF_TOKEN="${LLM_USE_HF_TOKEN:-0}"
+export LLM_DO_SAMPLE="${LLM_DO_SAMPLE:-false}"
+export LLM_TEMPERATURE="${LLM_TEMPERATURE:-0.2}"
+export LLM_MAX_NEW_TOKENS="${LLM_MAX_NEW_TOKENS:-96}"
 # Brouhaha checkpoint (SNR + reverb).
 export BROUHAHA_REPO="${BROUHAHA_REPO:-ylacombe/brouhaha-best}"
 # Bin edges / text bins for metadata_to_text.py.

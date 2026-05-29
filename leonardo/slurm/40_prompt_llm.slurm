@@ -35,6 +35,9 @@ echo "[llm] input:    $IN_DIR"
 echo "[llm] output:   $OUT_DIR"
 echo "[llm] model:    $LLM_MODEL_ID"
 echo "[llm] compile:  $LLM_TORCH_COMPILE"
+echo "[llm] sample:   $LLM_DO_SAMPLE"
+echo "[llm] temp:     $LLM_TEMPERATURE"
+echo "[llm] max tok:  $LLM_MAX_NEW_TOKENS"
 echo "[llm] trust remote code: $LLM_TRUST_REMOTE_CODE"
 echo "[llm] use HF token: $LLM_USE_HF_TOKEN"
 nvidia-smi -L || true
@@ -55,6 +58,15 @@ case "${LLM_USE_HF_TOKEN,,}" in
   1|true|yes|on) MODEL_EXTRA_ARGS+=(--token true) ;;
   *) MODEL_EXTRA_ARGS+=(--token false) ;;
 esac
+case "${LLM_DO_SAMPLE,,}" in
+  1|true|yes|on)
+    MODEL_EXTRA_ARGS+=(--do_sample true --temperature "$LLM_TEMPERATURE")
+    ;;
+  *)
+    MODEL_EXTRA_ARGS+=(--do_sample false)
+    ;;
+esac
+MODEL_EXTRA_ARGS+=(--max_new_tokens "$LLM_MAX_NEW_TOKENS")
 
 # A100 64GB fits Llama-3.1-8B-Instruct in bf16 with batch=64; no need for 4-bit.
 # Pass speaker_id_column so the script knows the dataset has multiple speakers;

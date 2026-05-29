@@ -63,6 +63,15 @@ case "${LLM_USE_HF_TOKEN,,}" in
   1|true|yes|on) MODEL_EXTRA_ARGS+=(--token true) ;;
   *) MODEL_EXTRA_ARGS+=(--token false) ;;
 esac
+case "${LLM_DO_SAMPLE,,}" in
+  1|true|yes|on)
+    MODEL_EXTRA_ARGS+=(--do_sample true --temperature "$LLM_TEMPERATURE")
+    ;;
+  *)
+    MODEL_EXTRA_ARGS+=(--do_sample false)
+    ;;
+esac
+MODEL_EXTRA_ARGS+=(--max_new_tokens "$LLM_MAX_NEW_TOKENS")
 
 echo "[named-llm] dataset:  $DATASET"
 echo "[named-llm] input:    $IN_DIR"
@@ -70,6 +79,9 @@ echo "[named-llm] output:   $OUT_DIR"
 echo "[named-llm] model:    $LLM_MODEL_ID"
 echo "[named-llm] names:    ${SPEAKER_NAMES_JSON:-single-speaker}"
 echo "[named-llm] compile:  $LLM_TORCH_COMPILE"
+echo "[named-llm] sample:   $LLM_DO_SAMPLE"
+echo "[named-llm] temp:     $LLM_TEMPERATURE"
+echo "[named-llm] max tok:  $LLM_MAX_NEW_TOKENS"
 echo "[named-llm] use HF token: $LLM_USE_HF_TOKEN"
 nvidia-smi -L || true
 
