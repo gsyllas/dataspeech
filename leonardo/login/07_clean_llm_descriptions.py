@@ -159,9 +159,10 @@ def fallback_description(sample: dict, speaker_names: dict[str, str] | None = No
 
 
 def clean_sample(sample: dict, speaker_names: dict[str, str] | None = None) -> dict:
-    cleaned = clean_description(sample.get("text_description", ""))
+    original = sample.get("text_description", "")
+    cleaned = clean_description(original)
     used_fallback = False
-    if _looks_suspicious(cleaned):
+    if _looks_suspicious(cleaned) or (_looks_suspicious(original) and cleaned[:1].islower()):
         cleaned = fallback_description(sample, speaker_names)
         used_fallback = True
     return {"text_description": cleaned, "_used_fallback": used_fallback}
