@@ -1,0 +1,121 @@
+{
+  "recommended": {
+    "id": "named_multi_v2_qwen_llm",
+    "path": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/dataspeech_out_named/multi_v2/04b_prompts_llm",
+    "source": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/greekData",
+    "sources": [
+      "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/greekData/commonVoice_greek_clean_with_speaker_ids",
+      "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/greekData/cs10_greek_dataset",
+      "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/greekData/greek_male_3.5h",
+      "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/greekData/greek_female_tts",
+      "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/greekData/greek_male_tts"
+    ],
+    "speaker_names_json": "/leonardo_work/EUHPC_D29_081/gsyllas0/dataspeech/leonardo/config/multi_v2_speaker_names.json",
+    "description_source": "qwen_llm",
+    "speaker_policy": "named",
+    "splits": ["train"],
+    "notes": "Use this as the primary Parler-TTS training dataset. It combines the three Greek HF datasets plus greek_female_tts and greek_male_tts; source speakers are renamed with generated Greek names."
+  },
+  "fallbacks": [
+    {
+      "id": "named_multi_v2_deterministic",
+      "path": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/dataspeech_out_named/multi_v2/04a_prompts_deterministic",
+      "source": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/greekData",
+      "sources": [
+        "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/greekData/commonVoice_greek_clean_with_speaker_ids",
+        "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/greekData/cs10_greek_dataset",
+        "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/greekData/greek_male_3.5h",
+        "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/greekData/greek_female_tts",
+        "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/greekData/greek_male_tts"
+      ],
+      "speaker_names_json": "/leonardo_work/EUHPC_D29_081/gsyllas0/dataspeech/leonardo/config/multi_v2_speaker_names.json",
+      "description_source": "deterministic",
+      "speaker_policy": "named",
+      "splits": ["train"]
+    }
+  ],
+  "reference_or_ablation_only": [
+    {
+      "id": "anonymous_greek_female_tts_qwen_llm",
+      "path": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/dataspeech_out/greek_female_tts/04b_prompts_llm",
+      "source": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/greekData/greek_female_tts",
+      "description_source": "qwen_llm",
+      "speaker_policy": "anonymous_gender_aware",
+      "splits": ["train"]
+    },
+    {
+      "id": "anonymous_greek_male_tts_qwen_llm",
+      "path": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/dataspeech_out/greek_male_tts/04b_prompts_llm",
+      "source": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/greekData/greek_male_tts",
+      "description_source": "qwen_llm",
+      "speaker_policy": "anonymous_gender_aware",
+      "splits": ["train"]
+    },
+    {
+      "id": "anonymous_greek_female_tts_deterministic",
+      "path": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/dataspeech_out/greek_female_tts/04a_prompts_deterministic",
+      "source": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/greekData/greek_female_tts",
+      "description_source": "deterministic",
+      "speaker_policy": "anonymous_gender_aware",
+      "splits": ["train"]
+    },
+    {
+      "id": "anonymous_greek_male_tts_deterministic",
+      "path": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/dataspeech_out/greek_male_tts/04a_prompts_deterministic",
+      "source": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/greekData/greek_male_tts",
+      "description_source": "deterministic",
+      "speaker_policy": "anonymous_gender_aware",
+      "splits": ["train"]
+    },
+    {
+      "id": "legacy_named_multi_qwen_llm",
+      "path": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/dataspeech_out_named/multi/04b_prompts_llm",
+      "source": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/multi_speaker_combined",
+      "speaker_names_json": "/leonardo_work/EUHPC_D29_081/gsyllas0/dataspeech/leonardo/config/multi_speaker_names.json",
+      "description_source": "qwen_llm",
+      "speaker_policy": "named",
+      "splits": ["train", "eval"]
+    },
+    {
+      "id": "legacy_named_multi_deterministic",
+      "path": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/dataspeech_out_named/multi/04a_prompts_deterministic",
+      "source": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/multi_speaker_combined",
+      "speaker_names_json": "/leonardo_work/EUHPC_D29_081/gsyllas0/dataspeech/leonardo/config/multi_speaker_names.json",
+      "description_source": "deterministic",
+      "speaker_policy": "named",
+      "splits": ["train", "eval"]
+    },
+    {
+      "id": "legacy_anonymous_female_qwen_llm",
+      "path": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/dataspeech_out/female/04b_prompts_llm",
+      "source": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/female_normalized",
+      "description_source": "qwen_llm",
+      "speaker_policy": "anonymous_gender_aware",
+      "splits": ["train"]
+    },
+    {
+      "id": "legacy_anonymous_male_qwen_llm",
+      "path": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/dataspeech_out/male/04b_prompts_llm",
+      "source": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/male_normalized",
+      "description_source": "qwen_llm",
+      "speaker_policy": "anonymous_gender_aware",
+      "splits": ["train"]
+    },
+    {
+      "id": "legacy_anonymous_female_deterministic",
+      "path": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/dataspeech_out/female/04a_prompts_deterministic",
+      "source": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/female_normalized",
+      "description_source": "deterministic",
+      "speaker_policy": "anonymous_gender_aware",
+      "splits": ["train"]
+    },
+    {
+      "id": "legacy_anonymous_male_deterministic",
+      "path": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/dataspeech_out/male/04a_prompts_deterministic",
+      "source": "/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/male_normalized",
+      "description_source": "deterministic",
+      "speaker_policy": "anonymous_gender_aware",
+      "splits": ["train"]
+    }
+  ]
+}

@@ -6,6 +6,9 @@
 #   bash leonardo/slurm/submit_all.sh female
 #   bash leonardo/slurm/submit_all.sh male
 #   bash leonardo/slurm/submit_all.sh both
+#   bash leonardo/slurm/submit_all.sh greek_female_tts
+#   bash leonardo/slurm/submit_all.sh greek_male_tts
+#   bash leonardo/slurm/submit_all.sh greek_tts
 #
 # Optional flags via env vars:
 #   SKIP_STAGE_10=1   skip annotation (use existing tags)
@@ -21,9 +24,10 @@ source leonardo/env.sh
 
 target="${1:-}"
 case "$target" in
-  female|male) DATASETS=("$target") ;;
+  female|male|greek_female_tts|greek_male_tts) DATASETS=("$target") ;;
   both)        DATASETS=(female male) ;;
-  *)           echo "usage: $0 {female|male|both}" >&2; exit 2 ;;
+  greek_tts)   DATASETS=(greek_female_tts greek_male_tts) ;;
+  *)           echo "usage: $0 {female|male|both|greek_female_tts|greek_male_tts|greek_tts}" >&2; exit 2 ;;
 esac
 
 # Sanity: input dataset(s) must exist on disk.

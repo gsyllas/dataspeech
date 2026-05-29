@@ -4,6 +4,7 @@
 # Usage:
 #   bash leonardo/slurm/submit_named.sh
 #   bash leonardo/slurm/submit_named.sh multi
+#   bash leonardo/slurm/submit_named.sh multi_v2
 #
 # Optional flags via env vars:
 #   SKIP_STAGE_10=1   skip annotation (use existing named tags)
@@ -21,8 +22,8 @@ export OUT_ROOT="$NAMED_OUT_ROOT"
 
 target="${1:-multi}"
 case "$target" in
-  multi) DATASETS=(multi) ;;
-  *)     echo "usage: $0 [multi]" >&2; exit 2 ;;
+  multi|multi_v2) DATASETS=("$target") ;;
+  *)              echo "usage: $0 [multi|multi_v2]" >&2; exit 2 ;;
 esac
 
 for ds in "${DATASETS[@]}"; do
@@ -30,7 +31,7 @@ for ds in "${DATASETS[@]}"; do
   if [ ! -d "$IN_DIR" ]; then
     echo "[submit-named] missing HF dataset for $ds at $IN_DIR" >&2
     echo "[submit-named] run on a login node first:" >&2
-    echo "               bash leonardo/login/04_prepare_named_variant.sh" >&2
+    echo "               bash leonardo/login/04_prepare_named_variant.sh $ds" >&2
     exit 1
   fi
 done

@@ -1,0 +1,10 @@
+speaker gender map: leonardo/config/commonvoice_greek_speaker_genders.json
+source: /home/gsyllas/greekData/commonVoice_greek_clean_genders/data/train-00000-of-00001.parquet
+rows with gender: 14312
+skipped rows: 0
+speakers: 12
+row genders: 14312
+conflicting speakers: 1
+
+conflicts:
+999: {'male': 6849, 'female': 414}

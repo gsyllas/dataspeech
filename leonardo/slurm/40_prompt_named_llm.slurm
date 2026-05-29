@@ -20,12 +20,13 @@ cd "$HERE_REPO"
 # shellcheck disable=SC1091
 source leonardo/env.sh
 
-: "${DATASET:?DATASET must be set to 'female', 'male', or 'multi'}"
+: "${DATASET:?DATASET must be set to 'female', 'male', 'multi', or 'multi_v2'}"
 activate_conda_env
 set_offline_mode
 
 IN_DIR="$(text_tags_dir_for "$DATASET")"
 OUT_DIR="$(prompts_llm_dir_for "$DATASET")"
+SPEAKER_NAMES_JSON=""
 mkdir -p "$OUT_DIR" "leonardo/logs"
 
 PROMPT_ARGS=(--is_new_speaker_prompt)
@@ -36,13 +37,14 @@ case "$DATASET" in
   male)
     PROMPT_ARGS+=(--is_single_speaker --speaker_name "$NAMED_MALE_SPEAKER_NAME")
     ;;
-  multi)
-    if [ ! -f "$NAMED_MULTI_SPEAKER_NAMES_JSON" ]; then
-      echo "[named-llm] missing speaker names JSON: $NAMED_MULTI_SPEAKER_NAMES_JSON" >&2
+  multi|multi_v2)
+    SPEAKER_NAMES_JSON="$(named_speaker_names_json_for "$DATASET")"
+    if [ ! -f "$SPEAKER_NAMES_JSON" ]; then
+      echo "[named-llm] missing speaker names JSON: $SPEAKER_NAMES_JSON" >&2
       echo "[named-llm] run leonardo/login/04_prepare_named_variant.sh first" >&2
       exit 1
     fi
-    PROMPT_ARGS+=(--speaker_id_column "speaker_id" --speaker_ids_to_name_json "$NAMED_MULTI_SPEAKER_NAMES_JSON")
+    PROMPT_ARGS+=(--speaker_id_column "speaker_id" --speaker_ids_to_name_json "$SPEAKER_NAMES_JSON")
     ;;
   *)
     echo "[named-llm] unknown DATASET=$DATASET" >&2
@@ -66,7 +68,7 @@ echo "[named-llm] dataset:  $DATASET"
 echo "[named-llm] input:    $IN_DIR"
 echo "[named-llm] output:   $OUT_DIR"
 echo "[named-llm] model:    $LLM_MODEL_ID"
-echo "[named-llm] names:    $NAMED_MULTI_SPEAKER_NAMES_JSON"
+echo "[named-llm] names:    ${SPEAKER_NAMES_JSON:-single-speaker}"
 echo "[named-llm] compile:  $LLM_TORCH_COMPILE"
 echo "[named-llm] use HF token: $LLM_USE_HF_TOKEN"
 nvidia-smi -L || true

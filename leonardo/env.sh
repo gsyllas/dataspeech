@@ -58,6 +58,14 @@ export DATA_ROOT="${DATA_ROOT:-/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts}"
 export FEMALE_DIR="${FEMALE_DIR:-$DATA_ROOT/female_normalized}"
 export MALE_DIR="${MALE_DIR:-$DATA_ROOT/male_normalized}"
 export MULTI_SPEAKER_DIR="${MULTI_SPEAKER_DIR:-$DATA_ROOT/multi_speaker_combined}"
+export GREEK_DATA_ROOT="${GREEK_DATA_ROOT:-$DATA_ROOT/greekData}"
+export COMMONVOICE_GREEK_DIR="${COMMONVOICE_GREEK_DIR:-$GREEK_DATA_ROOT/commonVoice_greek_clean_with_speaker_ids}"
+export CS10_GREEK_DIR="${CS10_GREEK_DIR:-$GREEK_DATA_ROOT/cs10_greek_dataset}"
+export GREEK_MALE_35H_DIR="${GREEK_MALE_35H_DIR:-$GREEK_DATA_ROOT/greek_male_3.5h}"
+export GREEK_FEMALE_TTS_DIR="${GREEK_FEMALE_TTS_DIR:-$GREEK_DATA_ROOT/greek_female_tts}"
+export GREEK_MALE_TTS_DIR="${GREEK_MALE_TTS_DIR:-$GREEK_DATA_ROOT/greek_male_tts}"
+export MULTI_V2_COMPONENTS="${MULTI_V2_COMPONENTS:-commonVoice_greek_clean_with_speaker_ids cs10_greek_dataset greek_male_3.5h greek_female_tts greek_male_tts}"
+export COMMONVOICE_GREEK_GENDER_JSON="${COMMONVOICE_GREEK_GENDER_JSON:-$REPO_ROOT/leonardo/config/commonvoice_greek_speaker_genders.json}"
 export METADATA_CSV_NAME="${METADATA_CSV_NAME:-metadata.csv}"
 export WAVS_SUBDIR="${WAVS_SUBDIR:-wavs}"
 
@@ -67,6 +75,7 @@ export NAMED_OUT_ROOT="${NAMED_OUT_ROOT:-$DATA_ROOT/dataspeech_out_named}"
 export NAMED_FEMALE_SPEAKER_NAME="${NAMED_FEMALE_SPEAKER_NAME:-Eleni}"
 export NAMED_MALE_SPEAKER_NAME="${NAMED_MALE_SPEAKER_NAME:-Nikos}"
 export NAMED_MULTI_SPEAKER_NAMES_JSON="${NAMED_MULTI_SPEAKER_NAMES_JSON:-$REPO_ROOT/leonardo/config/multi_speaker_names.json}"
+export NAMED_MULTI_V2_SPEAKER_NAMES_JSON="${NAMED_MULTI_V2_SPEAKER_NAMES_JSON:-$REPO_ROOT/leonardo/config/multi_v2_speaker_names.json}"
 export NAMED_SPEAKER_NAME_SEED="${NAMED_SPEAKER_NAME_SEED:-1337}"
 export MULTI_MIN_SPEAKER_HOURS="${MULTI_MIN_SPEAKER_HOURS:-1.0}"
 
@@ -94,7 +103,21 @@ dataset_dir_for() {
     female) echo "$FEMALE_DIR" ;;
     male)   echo "$MALE_DIR" ;;
     multi)  echo "$MULTI_SPEAKER_DIR" ;;
-    *) echo "[env.sh] unknown DATASET='${1:-}'; expected 'female', 'male', or 'multi'" >&2; return 1 ;;
+    commonVoice_greek_clean_with_speaker_ids) echo "$COMMONVOICE_GREEK_DIR" ;;
+    cs10_greek_dataset) echo "$CS10_GREEK_DIR" ;;
+    greek_male_3.5h) echo "$GREEK_MALE_35H_DIR" ;;
+    greek_female_tts) echo "$GREEK_FEMALE_TTS_DIR" ;;
+    greek_male_tts) echo "$GREEK_MALE_TTS_DIR" ;;
+    multi_v2) echo "$GREEK_DATA_ROOT" ;;
+    *) echo "[env.sh] unknown DATASET='${1:-}'" >&2; return 1 ;;
+  esac
+}
+
+named_speaker_names_json_for() {
+  case "${1:-}" in
+    multi) echo "$NAMED_MULTI_SPEAKER_NAMES_JSON" ;;
+    multi_v2) echo "$NAMED_MULTI_V2_SPEAKER_NAMES_JSON" ;;
+    *) echo "[env.sh] no named speaker JSON configured for DATASET='${1:-}'" >&2; return 1 ;;
   esac
 }
 

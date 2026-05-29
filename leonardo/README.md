@@ -1,13 +1,31 @@
 # Leonardo HPC pipeline for dataspeech
 
-End-to-end pipeline for tagging the two TTS datasets on Leonardo:
+End-to-end pipeline for tagging the Greek TTS datasets on Leonardo.
+
+Legacy standalone inputs:
 
 - `/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/female_normalized/`
 - `/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/male_normalized/`
 
-Each one has a `metadata.csv` (columns: `filename, speaker_id,
+Each legacy input has a `metadata.csv` (columns: `filename, speaker_id,
 transcription, transcription_original, origin_dataset, gender`) and a
 `wavs/` directory.
+
+Greek v2 inputs live under `/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/greekData/`:
+
+- `commonVoice_greek_clean_with_speaker_ids` — local HF parquet dataset repo.
+- `cs10_greek_dataset` — local HF parquet dataset repo.
+- `greek_male_3.5h` — local HF parquet dataset repo.
+- `greek_female_tts` — `metadata.csv` plus `wavs/`, pipe-separated no-header metadata.
+- `greek_male_tts` — `metadata.csv` plus `wavs/`, pipe-separated no-header metadata.
+
+The pipe-separated Greek TTS metadata schema is:
+
+```text
+wav_id|text|speaker|source|duration_s
+```
+
+The builder turns `wav_id` into `wavs/<wav_id>.wav`.
 
 The compute nodes have **no internet**, so everything has to be pre-staged
 on a login node: conda env, HF models, torch hub checkpoints, penn pitch
@@ -62,6 +80,16 @@ huggingface-cli login
 python leonardo/login/01_cache_models.py     # ~10 min; downloads all weights
 python leonardo/login/02_probe_audio.py      # tells us actual sample rate / channels
 python leonardo/login/03_build_hf_dataset.py --dataset both
+
+# Greek v2 standalone anonymous inputs:
+python leonardo/login/03_build_hf_dataset.py --dataset greek_tts
+
+# Optional but recommended: build CommonVoice speaker/row genders from
+# $GREEK_DATA_ROOT/commonVoice_greek_clean_genders.
+python leonardo/login/06_build_commonvoice_gender_map.py
+
+# Greek v2 named combined input + speaker-name JSON:
+bash leonardo/login/04_prepare_named_variant.sh multi_v2
 ```
 
 `02_probe_audio.py` is purely informational — it lets us see what the
@@ -74,10 +102,13 @@ resamples to 16k for pitch/SNR/SQUIM.
 ```bash
 # Submit the full pipeline for both datasets, chained with afterok deps:
 bash leonardo/slurm/submit_all.sh both
+bash leonardo/slurm/submit_all.sh greek_tts
 
 # Or just one:
 bash leonardo/slurm/submit_all.sh female
 bash leonardo/slurm/submit_all.sh male
+bash leonardo/slurm/submit_all.sh greek_female_tts
+bash leonardo/slurm/submit_all.sh greek_male_tts
 
 # Or one stage at a time:
 DATASET=female sbatch leonardo/slurm/10_annotate.slurm
@@ -92,9 +123,23 @@ run **in parallel** after it finishes. Stage 40 is the long one; stage
 
 The default pipeline above keeps prompts anonymous and gender-aware. To build
 a separate named-speaker version, use the named output root. This does not
-overwrite `$OUT_ROOT`. The named variant uses only `multi_speaker_combined`,
-because it already contains the standalone female/male speakers plus the
-additional multi-speaker data.
+overwrite `$OUT_ROOT`.
+
+For the current Greek v2 named bundle:
+
+```bash
+source leonardo/env.sh
+activate_conda_env
+
+bash leonardo/login/04_prepare_named_variant.sh multi_v2
+
+export LLM_MODEL_ID="Qwen/Qwen2.5-7B-Instruct"
+export LLM_TORCH_COMPILE=0
+export LLM_USE_HF_TOKEN=0
+bash leonardo/slurm/submit_named.sh multi_v2
+```
+
+For the older named bundle, use `multi_speaker_combined`:
 
 ```bash
 source leonardo/env.sh
@@ -116,9 +161,10 @@ Defaults:
 - `female` inside the multi-speaker source uses `$NAMED_FEMALE_SPEAKER_NAME` (`Eleni`).
 - `male` inside the multi-speaker source uses `$NAMED_MALE_SPEAKER_NAME` (`Nikos`).
 - multi-speaker prompts use `$NAMED_MULTI_SPEAKER_NAMES_JSON`.
+- multi_v2 prompts use `$NAMED_MULTI_V2_SPEAKER_NAMES_JSON`.
 - multi filtering uses `$MULTI_MIN_SPEAKER_HOURS` (`1.0`).
-- generated multi names are unique; `female` and `cs10*` speakers receive
-  female names, while `male`, `male3h*`, and `cv_speaker_*` receive male names.
+- generated names are unique. `multi_v2` uses the source `gender` column when
+  present, otherwise it falls back to dataset-level gender defaults.
 
 ## Outputs
 
@@ -132,6 +178,24 @@ $OUT_ROOT/<female|male>/
   03_text_tags/                  # metadata_to_text.py output (text bins)
   04a_prompts_deterministic/     # deterministic descriptions
   04b_prompts_llm/               # Llama-3.1 generated descriptions
+```
+
+For Greek v2:
+
+```
+$OUT_ROOT/<greek_female_tts|greek_male_tts>/
+  01_hf_dataset/
+  02_tags/
+  03_text_tags/
+  04a_prompts_deterministic/
+  04b_prompts_llm/
+
+$NAMED_OUT_ROOT/multi_v2/
+  01_hf_dataset/
+  02_tags/
+  03_text_tags/
+  04a_prompts_deterministic/
+  04b_prompts_llm/
 ```
 
 Hub upload is NOT done from compute nodes (no internet). If you want to
@@ -157,7 +221,11 @@ Edit `leonardo/env.sh` or override on the command line:
 - `NAMED_OUT_ROOT` — separate output root for named-speaker runs.
 - `NAMED_FEMALE_SPEAKER_NAME` / `NAMED_MALE_SPEAKER_NAME` — single-speaker names.
 - `NAMED_MULTI_SPEAKER_NAMES_JSON` — generated `speaker_id -> name` map for multi.
+- `NAMED_MULTI_V2_SPEAKER_NAMES_JSON` — generated `speaker_id -> name` map for multi_v2.
+- `COMMONVOICE_GREEK_GENDER_JSON` — optional `speaker_id -> gender` map for CommonVoice Greek.
 - `MULTI_SPEAKER_DIR` / `MULTI_MIN_SPEAKER_HOURS` — source and threshold for multi.
+- `GREEK_DATA_ROOT` — source root for the Greek v2 datasets.
+- `COMMONVOICE_GREEK_DIR`, `CS10_GREEK_DIR`, `GREEK_MALE_35H_DIR`, `GREEK_FEMALE_TTS_DIR`, `GREEK_MALE_TTS_DIR` — override individual Greek v2 source paths.
 - `CPU_NUM_WORKERS` / `PREPROC_WORKERS` — boost node has 32 cores, default 8.
 - `DATA_ROOT`, `FEMALE_DIR`, `MALE_DIR` — point elsewhere if data moves.
 - `OUT_ROOT` — change where outputs land.
