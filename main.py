@@ -48,6 +48,11 @@ if __name__ == "__main__":
     text_column_name = "text" if args.rename_column else args.text_column_name
     if args.rename_column:
         dataset = dataset.rename_columns({args.audio_column_name: "audio", args.text_column_name: "text"})
+
+    # Some Leonardo build steps store the raw Audio storage struct instead of an
+    # Audio feature so save_to_disk does not try to re-embed large/mixed audio.
+    # Cast here so all enrichment functions receive decoded audio arrays.
+    dataset = dataset.cast_column(audio_column_name, Audio())
         
 
     if args.apply_squim_quality_estimation:

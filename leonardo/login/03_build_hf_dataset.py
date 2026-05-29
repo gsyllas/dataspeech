@@ -37,6 +37,7 @@ import argparse
 import json
 import os
 import random
+import shutil
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -105,6 +106,24 @@ NORMALIZED_COLUMNS = [
     "duration_s",
     "source_speaker_id",
 ]
+
+
+def _normalized_features():
+    from datasets import Features, Value
+
+    return Features({
+        "audio": {
+            "bytes": Value("binary"),
+            "path": Value("string"),
+        },
+        "text": Value("string"),
+        "speaker_id": Value("string"),
+        "gender": Value("string"),
+        "origin_dataset": Value("string"),
+        "source": Value("string"),
+        "duration_s": Value("float64"),
+        "source_speaker_id": Value("string"),
+    })
 
 
 FEMALE_NAMES = [
@@ -524,6 +543,7 @@ def _normalize_hf_split(ds, name: str, prefix_speaker_ids: bool):
 
     if "audio" not in ds.column_names:
         raise SystemExit(f"{name}: expected an audio column, got {ds.column_names}")
+    ds = ds.cast_column("audio", Audio(decode=False))
 
     text_col = _first_existing(ds.column_names, TEXT_COLUMN_CANDIDATES)
     if text_col is None:
@@ -592,7 +612,7 @@ def _normalize_hf_split(ds, name: str, prefix_speaker_ids: bool):
     missing = [column for column in NORMALIZED_COLUMNS if column not in ds.column_names]
     if missing:
         raise SystemExit(f"{name}: normalized split is missing columns {missing}")
-    return ds.select_columns(NORMALIZED_COLUMNS)
+    return ds.select_columns(NORMALIZED_COLUMNS).cast(_normalized_features())
 
 
 def _normalize_hf_dataset_dict(name: str, raw, prefix_speaker_ids: bool):
@@ -608,7 +628,7 @@ def _normalize_hf_dataset_dict(name: str, raw, prefix_speaker_ids: bool):
 
 def _pipe_tts_dataset_dict(name: str, src: Path, split: str, prefix_speaker_ids: bool):
     import pandas as pd
-    from datasets import Audio, Dataset, DatasetDict
+    from datasets import Dataset, DatasetDict
 
     csv_path = src / os.environ.get("METADATA_CSV_NAME", "metadata.csv")
     wavs_dir = src / os.environ.get("WAVS_SUBDIR", "wavs")
@@ -634,7 +654,7 @@ def _pipe_tts_dataset_dict(name: str, src: Path, split: str, prefix_speaker_ids:
             rel = rel.with_suffix(".wav")
         return str(wavs_dir / rel)
 
-    df["audio"] = df["wav_id"].map(to_audio_path)
+    df["audio"] = df["wav_id"].map(lambda wav_id: {"bytes": None, "path": to_audio_path(wav_id)})
     df["text"] = df["text"].map(_collapse_ws)
     df["source_speaker_id"] = df["speaker"].map(lambda value: _collapse_ws(value) or f"{gender}_01")
     if prefix_speaker_ids:
@@ -646,14 +666,14 @@ def _pipe_tts_dataset_dict(name: str, src: Path, split: str, prefix_speaker_ids:
     df["source"] = df["source"].map(lambda value: _collapse_ws(value) or name)
     df["duration_s"] = df["duration_s"].map(_to_float_or_none)
 
-    missing_audio = [p for p in df["audio"].head(20) if not Path(p).is_file()]
+    missing_audio = [item["path"] for item in df["audio"].head(20) if not Path(item["path"]).is_file()]
     if missing_audio:
         print(f"[build] {name}: WARNING first audio paths missing:", flush=True)
         for p in missing_audio[:5]:
             print(f"   {p}", flush=True)
 
-    ds = Dataset.from_pandas(df[NORMALIZED_COLUMNS], preserve_index=False)
-    ds = ds.cast_column("audio", Audio())
+    data = {column: df[column].tolist() for column in NORMALIZED_COLUMNS}
+    ds = Dataset.from_dict(data, features=_normalized_features())
     dd = DatasetDict({split: ds})
     print(f"[build] {name}/{split}: normalized {len(ds)} rows", flush=True)
     return dd
@@ -734,8 +754,11 @@ def _build_multi_v2(out_dir: Path, split: str, speaker_names_json: str | None) -
             flush=True,
         )
 
-    out_dir.mkdir(parents=True, exist_ok=True)
     _write_speaker_names_json_from_dataset(processed, speaker_names_json, "multi_v2")
+    if out_dir.exists():
+        print(f"[build] multi_v2: removing existing output {out_dir}", flush=True)
+        shutil.rmtree(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
     print(f"[build] multi_v2: writing to {out_dir}", flush=True)
     processed.save_to_disk(str(out_dir))
     print(f"[build] multi_v2: done. Verify with `python -c \"from datasets import load_from_disk; "
@@ -744,6 +767,9 @@ def _build_multi_v2(out_dir: Path, split: str, speaker_names_json: str | None) -
 
 def _build_greek_source(name: str, out_dir: Path, split: str, speaker_names_json: str | None) -> None:
     dd = _normalized_source_dataset(name, split, prefix_speaker_ids=False)
+    if out_dir.exists():
+        print(f"[build] {name}: removing existing output {out_dir}", flush=True)
+        shutil.rmtree(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     if speaker_names_json:
         _write_speaker_names_json_from_dataset(dd, speaker_names_json, name)
