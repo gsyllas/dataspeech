@@ -17,6 +17,7 @@
 #   * numpy must stay <2 to match the cu121 torch wheels' build.
 torch==2.5.1
 torchaudio==2.5.1
+torchvision==0.20.1
 transformers>=4.52,<5
 accelerate>=0.30
 numpy<2

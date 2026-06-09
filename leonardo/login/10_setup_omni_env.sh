@@ -50,11 +50,15 @@ conda activate "$OMNI_CONDA_ENV_PREFIX"
 # ---- 3. pip dependencies ----------------------------------------------------
 OMNI_CONSTRAINTS="$HERE/omni-constraints.txt"
 TORCH_VERSION="2.5.1"
+# torchvision 0.20.1 pairs with torch 2.5.1. It is required because
+# Qwen2_5OmniProcessor builds a video sub-processor at load time (even though we
+# never pass video), which needs the torchvision backend to import.
+TORCHVISION_VERSION="0.20.1"
 
 echo "[omni-setup] installing pytorch (cu121 wheels)"
 pip install --upgrade pip
 pip install --index-url https://download.pytorch.org/whl/cu121 \
-  "torch==$TORCH_VERSION" "torchaudio==$TORCH_VERSION"
+  "torch==$TORCH_VERSION" "torchaudio==$TORCH_VERSION" "torchvision==$TORCHVISION_VERSION"
 
 # Transformers spec: 4.52 <= v < 5 for Qwen2.5-Omni.
 # MUST stay <5: transformers 5.x imports torch.float8_e8m0fnu at load time,
