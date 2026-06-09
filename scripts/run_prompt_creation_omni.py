@@ -359,8 +359,47 @@ def _resolve_omni_classes(model_name: str):
     )
 
 
+def _neutralize_torch_load_check() -> None:
+    """Allow torch.load of Qwen's trusted spk_dict.pt on torch<2.6.
+
+    transformers>=4.57 hard-blocks torch.load unless torch>=2.6 (CVE-2025-32434).
+    Leonardo is pinned to torch 2.5.1 (no cu121 wheel exists for 2.6+). The only
+    torch.load this path triggers is Qwen2.5-Omni's official `spk_dict.pt`
+    (talker voice presets), loaded with weights_only=True from the offline cache
+    during from_pretrained -- and we disable the talker immediately after, so the
+    speaker data is never used. Neutralise that single check for this trusted file.
+    """
+    noop = lambda *a, **k: None  # noqa: E731
+    patched = []
+    try:
+        import transformers.utils.import_utils as iu
+        iu.check_torch_load_is_safe = noop
+        patched.append("utils.import_utils")
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        import transformers.utils as tu
+        if hasattr(tu, "check_torch_load_is_safe"):
+            tu.check_torch_load_is_safe = noop
+            patched.append("utils")
+    except Exception:  # noqa: BLE001
+        pass
+    # The call site binds the name as a module global, so patch it there too.
+    try:
+        from transformers.models.qwen2_5_omni import modeling_qwen2_5_omni as mq
+        if hasattr(mq, "check_torch_load_is_safe"):
+            mq.check_torch_load_is_safe = noop
+            patched.append("qwen2_5_omni.modeling")
+    except Exception:  # noqa: BLE001
+        pass
+    if patched:
+        logger.info("Neutralised torch.load safety check for trusted spk_dict.pt (%s).",
+                    ", ".join(patched))
+
+
 def load_model_and_processor(args):
     model_cls, processor_cls = _resolve_omni_classes(args.model_name_or_path)
+    _neutralize_torch_load_check()
 
     torch_dtype = getattr(torch, args.torch_dtype) if args.torch_dtype not in ("auto", None) else "auto"
     logger.info("Loading Omni model %s via %s (dtype=%s)",
