@@ -22,6 +22,9 @@ export REPO_ROOT
 
 # Conda env lives INSIDE the repo (per user requirement: no $HOME space).
 export CONDA_ENV_PREFIX="${CONDA_ENV_PREFIX:-$REPO_ROOT/.conda/dataspeech}"
+# Dedicated env for the standalone Qwen-Omni path. It needs a newer transformers
+# than the tag pipeline, so it is kept separate to avoid breaking the latter.
+export OMNI_CONDA_ENV_PREFIX="${OMNI_CONDA_ENV_PREFIX:-$REPO_ROOT/.conda/omni}"
 
 # All HF / torch / penn caches live next to the repo on /leonardo_work.
 # Some login-node shells already export HF_HOME / TORCH_HOME from old projects;
@@ -88,6 +91,17 @@ export LLM_USE_HF_TOKEN="${LLM_USE_HF_TOKEN:-0}"
 export LLM_DO_SAMPLE="${LLM_DO_SAMPLE:-false}"
 export LLM_TEMPERATURE="${LLM_TEMPERATURE:-0.2}"
 export LLM_MAX_NEW_TOKENS="${LLM_MAX_NEW_TOKENS:-96}"
+# Standalone Qwen2.5-Omni path (audio -> English description, no tag pipeline).
+# Reads 01_hf_dataset directly and writes 04c_prompts_omni. Needs transformers>=4.52.
+export OMNI_MODEL_ID="${OMNI_MODEL_ID:-Qwen/Qwen2.5-Omni-7B}"
+export OMNI_PROMPT_STYLE="${OMNI_PROMPT_STYLE:-parler}"   # parler | rich | minimal
+export OMNI_USE_GENDER_HINT="${OMNI_USE_GENDER_HINT:-1}"  # 1 = inject known gender
+export OMNI_MAX_NEW_TOKENS="${OMNI_MAX_NEW_TOKENS:-120}"
+export OMNI_TEMPERATURE="${OMNI_TEMPERATURE:-0.7}"
+export OMNI_NUM_RETRIES="${OMNI_NUM_RETRIES:-2}"          # resampled retries on bad output
+export OMNI_TARGET_SR="${OMNI_TARGET_SR:-16000}"
+export OMNI_TRUST_REMOTE_CODE="${OMNI_TRUST_REMOTE_CODE:-0}"
+export OMNI_SAVE_STEPS="${OMNI_SAVE_STEPS:-200}"
 # Brouhaha checkpoint (SNR + reverb).
 export BROUHAHA_REPO="${BROUHAHA_REPO:-ylacombe/brouhaha-best}"
 # Bin edges / text bins for metadata_to_text.py.
@@ -131,6 +145,7 @@ tags_dir_for()        { echo "$OUT_ROOT/$1/02_tags"; }
 text_tags_dir_for()   { echo "$OUT_ROOT/$1/03_text_tags"; }
 prompts_det_dir_for() { echo "$OUT_ROOT/$1/04a_prompts_deterministic"; }
 prompts_llm_dir_for() { echo "$OUT_ROOT/$1/04b_prompts_llm"; }
+prompts_omni_dir_for(){ echo "$OUT_ROOT/$1/04c_prompts_omni"; }
 
 # Activate the in-repo conda env on Leonardo. Looks for conda in common spots.
 activate_conda_env() {
@@ -149,6 +164,33 @@ activate_conda_env() {
   # shellcheck disable=SC1090
   source "$conda_sh"
   conda activate "$CONDA_ENV_PREFIX"
+}
+
+# Activate the dedicated Qwen-Omni env. Falls back to the main env (with a
+# warning) if the Omni env hasn't been built yet.
+activate_omni_conda_env() {
+  local conda_sh=""
+  for c in \
+    "$REPO_ROOT/.conda/miniforge/etc/profile.d/conda.sh" \
+    "$HOME/miniforge3/etc/profile.d/conda.sh" \
+    "$HOME/miniconda3/etc/profile.d/conda.sh" \
+    "/leonardo/prod/opt/tools/miniconda3/2024.06/none/etc/profile.d/conda.sh"; do
+    if [ -f "$c" ]; then conda_sh="$c"; break; fi
+  done
+  if [ -z "$conda_sh" ]; then
+    echo "[env.sh] could not find conda.sh; install miniforge first (see leonardo/login/00_setup_conda_env.sh)" >&2
+    return 1
+  fi
+  # shellcheck disable=SC1090
+  source "$conda_sh"
+  if [ -x "$OMNI_CONDA_ENV_PREFIX/bin/python" ]; then
+    conda activate "$OMNI_CONDA_ENV_PREFIX"
+  else
+    echo "[env.sh] Omni env not found at $OMNI_CONDA_ENV_PREFIX; build it with" >&2
+    echo "         bash leonardo/login/10_setup_omni_env.sh" >&2
+    echo "[env.sh] falling back to $CONDA_ENV_PREFIX (transformers may be too old)" >&2
+    conda activate "$CONDA_ENV_PREFIX"
+  fi
 }
 
 # Force offline mode for compute nodes (no internet).

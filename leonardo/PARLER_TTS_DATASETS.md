@@ -37,6 +37,19 @@ These are standalone anonymous/gender-aware outputs for the two pipe-metadata TT
 /leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/dataspeech_out/greek_male_tts/04a_prompts_deterministic
 ```
 
+## Qwen2.5-Omni Standalone Descriptions
+
+Alternative descriptions written by Qwen2.5-Omni directly from the audio
+(no tag pipeline). These keep the audio column and add a `_omni_failed` flag
+column (rows where Omni did not return a valid English description have an
+empty `text_description`).
+
+```text
+/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/dataspeech_out/greek_female_tts/04c_prompts_omni
+/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/dataspeech_out/greek_male_tts/04c_prompts_omni
+/leonardo_work/EUHPC_D29_081/gsyllas0/data/tts/dataspeech_out_named/multi_v2/04c_prompts_omni
+```
+
 ## Build Commands
 
 ```bash
@@ -57,6 +70,18 @@ export LLM_MODEL_ID="Qwen/Qwen2.5-7B-Instruct"
 export LLM_TORCH_COMPILE=0
 export LLM_USE_HF_TOKEN=0
 bash leonardo/slurm/submit_named.sh multi_v2
+
+# Standalone Qwen2.5-Omni descriptions (audio -> text, no tag pipeline).
+# One-time: build the dedicated Omni env, then cache the model on a login node.
+bash leonardo/login/10_setup_omni_env.sh
+activate_omni_conda_env
+python leonardo/login/09_cache_omni_model.py
+bash leonardo/slurm/submit_omni.sh greek_tts
+bash leonardo/slurm/submit_omni.sh multi_v2
+
+# After it finishes, eyeball quality + the _omni_failed rate:
+python leonardo/login/11_inspect_omni_outputs.py --dataset greek_tts
+python leonardo/login/11_inspect_omni_outputs.py --root "$NAMED_OUT_ROOT" --dataset multi_v2
 ```
 
 ## Quick Check

@@ -41,13 +41,18 @@ leonardo/
 │   ├── 00_setup_conda_env.sh             # Build conda env INSIDE the repo
 │   ├── 01_cache_models.py                # Pre-download brouhaha/squim/penn/LLM
 │   ├── 02_probe_audio.py                 # Sample-rate / channel / duration stats
-│   └── 03_build_hf_dataset.py            # CSV + wavs/ -> save_to_disk DatasetDict
+│   ├── 03_build_hf_dataset.py            # CSV + wavs/ -> save_to_disk DatasetDict
+│   ├── 09_cache_omni_model.py            # Pre-download the Qwen-Omni weights
+│   ├── 10_setup_omni_env.sh              # Build the DEDICATED Omni conda env
+│   └── 11_inspect_omni_outputs.py        # QA: sample descriptions + _omni_failed rate
 ├── slurm/                                # Submitted to COMPUTE nodes
 │   ├── 10_annotate.slurm                 # main.py (pitch/SNR/SI-SDR/rate)
 │   ├── 20_metadata_to_text.slurm         # bin -> text mapping
 │   ├── 30_prompt_deterministic.slurm     # deterministic descriptions
 │   ├── 40_prompt_llm.slurm               # LLM (Llama-3.1-8B-Instruct) descriptions
-│   └── submit_all.sh                     # Chain stages with --dependency=afterok
+│   ├── 45_prompt_omni.slurm              # STANDALONE Qwen2.5-Omni descriptions (audio -> text)
+│   ├── submit_all.sh                     # Chain stages with --dependency=afterok
+│   └── submit_omni.sh                    # Submit the standalone Omni path
 └── logs/                                 # SLURM stdout/stderr land here
 ```
 
@@ -166,6 +171,86 @@ Defaults:
 - generated names are unique. `multi_v2` uses the source `gender` column when
   present, otherwise it falls back to dataset-level gender defaults.
 
+## Standalone Qwen2.5-Omni prompt path
+
+This is an **alternative** way to produce `text_description`. Instead of the
+tag pipeline (annotate → bins → LLM phrasing), it hands the **raw audio** plus
+an instruction prompt to **Qwen2.5-Omni** (a multimodal audio-language model)
+and lets the model write the English description by *listening* to the clip.
+
+It does not need stages 02/03/04 — only `01_hf_dataset` (which still has the
+audio column). Output lands next to the others as `04c_prompts_omni`, and it
+keeps the audio column, so it is directly trainable without the stage 05
+attach-audio step.
+
+Guardrails (input speech is Greek, descriptions must be English):
+
+- a system prompt forces English-only output and forbids transcription or
+  naming the spoken language;
+- the known `gender` is injected into the prompt as a hint;
+- every output is validated (English/Latin script, on-topic, not a
+  refusal/transcription) with up to `OMNI_NUM_RETRIES` resampled retries;
+- rows that still fail are left **empty** and flagged in a `_omni_failed`
+  column rather than filled with garbage or foreign-language text.
+
+This path has its **own conda env** (`$OMNI_CONDA_ENV_PREFIX`, default
+`.conda/omni`) because Qwen-Omni needs a newer transformers than the tag
+pipeline tolerates. The tag-pipeline env is left untouched.
+
+```bash
+source leonardo/env.sh
+
+# One-time on a login node: build the dedicated Omni env, then cache the model.
+bash leonardo/login/10_setup_omni_env.sh
+activate_omni_conda_env
+python leonardo/login/09_cache_omni_model.py
+
+# Build 01_hf_dataset first if you have not (uses the MAIN env):
+activate_conda_env
+python leonardo/login/03_build_hf_dataset.py --dataset greek_tts
+# or: bash leonardo/login/04_prepare_named_variant.sh multi_v2
+
+# Submit the standalone Omni path (writes 04c_prompts_omni):
+bash leonardo/slurm/submit_omni.sh greek_female_tts
+bash leonardo/slurm/submit_omni.sh greek_male_tts
+bash leonardo/slurm/submit_omni.sh greek_tts          # both
+bash leonardo/slurm/submit_omni.sh multi_v2           # named, uses NAMED_OUT_ROOT
+
+# After the job finishes, eyeball quality + the _omni_failed rate:
+activate_omni_conda_env
+python leonardo/login/11_inspect_omni_outputs.py --dataset greek_tts
+python leonardo/login/11_inspect_omni_outputs.py --root "$NAMED_OUT_ROOT" --dataset multi_v2
+```
+
+### Which Omni model? (2.5 vs 3)
+
+The default is **`Qwen/Qwen2.5-Omni-7B`** because it cleanly fits a single
+A100 64GB in bf16 (talker disabled) and is supported by stable
+`transformers>=4.52`. **Qwen3-Omni** (`Qwen3-Omni-30B-A3B-*`) is newer and
+stronger but is a ~30B MoE: its weights alone need ~60GB, so it does not
+comfortably fit one 64GB GPU in bf16 (you would need multi-GPU or
+quantization) and it requires `transformers>=4.57`.
+
+The script supports **both** — it picks the right classes from
+`OMNI_MODEL_ID`. To use Qwen3-Omni, rebuild the env with the newer
+transformers floor and point the env var at it:
+
+```bash
+TRANSFORMERS_SPEC='transformers>=4.57' bash leonardo/login/10_setup_omni_env.sh
+export OMNI_MODEL_ID="Qwen/Qwen3-Omni-30B-A3B-Instruct"
+python leonardo/login/09_cache_omni_model.py
+# Consider --gres=gpu:2 (edit 45_prompt_omni.slurm) for the 30B MoE.
+bash leonardo/slurm/submit_omni.sh greek_female_tts
+```
+
+Change the prompt style (or use the smaller 3B Omni) before submitting:
+
+```bash
+export OMNI_MODEL_ID="Qwen/Qwen2.5-Omni-3B"   # smaller/faster
+export OMNI_PROMPT_STYLE="rich"               # parler | rich | minimal
+bash leonardo/slurm/submit_omni.sh greek_female_tts
+```
+
 ## Outputs
 
 Each stage writes to `$OUT_ROOT/<dataset>/<stage>/` as a
@@ -178,6 +263,7 @@ $OUT_ROOT/<female|male>/
   03_text_tags/                  # metadata_to_text.py output (text bins)
   04a_prompts_deterministic/     # deterministic descriptions
   04b_prompts_llm/               # Llama-3.1 generated descriptions
+  04c_prompts_omni/              # Qwen2.5-Omni descriptions (standalone, from audio)
 ```
 
 For Greek v2:
@@ -214,6 +300,11 @@ PY
 Edit `leonardo/env.sh` or override on the command line:
 
 - `LLM_MODEL_ID` — change LLM (default `meta-llama/Meta-Llama-3.1-8B-Instruct`).
+- `OMNI_MODEL_ID` — Qwen2.5-Omni model for the standalone path (default `Qwen/Qwen2.5-Omni-7B`).
+- `OMNI_PROMPT_STYLE` — `parler` (default), `rich`, or `minimal`.
+- `OMNI_USE_GENDER_HINT` — `1` (default) injects the known gender into the prompt.
+- `OMNI_NUM_RETRIES` — resampled retries when an output fails the English check (default `2`).
+- `OMNI_MAX_NEW_TOKENS` / `OMNI_TEMPERATURE` / `OMNI_TARGET_SR` — generation knobs.
 - `LLM_TORCH_COMPILE` — set `0` for non-Llama/Gemma models such as Qwen or Mistral.
 - `LLM_TRUST_REMOTE_CODE` — set `1` only for models that require custom Hub code.
 - `LLM_USE_HF_TOKEN` — set `1` for gated/private models; keep `0` for public models.
