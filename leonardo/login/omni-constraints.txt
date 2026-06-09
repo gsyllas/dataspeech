@@ -5,13 +5,18 @@
 # want to disturb.
 #
 #   * Qwen2.5-Omni was added in transformers 4.52.
-#   * Qwen3-Omni (MoE) was added in transformers 4.57. Use that floor if you
-#     point OMNI_MODEL_ID at a Qwen3-Omni checkpoint.
+#   * transformers MUST stay <5: transformers 5.x imports torch.float8_e8m0fnu
+#     at load time, a dtype that only exists in torch>=2.7. Leonardo is pinned
+#     to torch 2.5.1 (newest cu121 wheel), so 5.x cannot even import here. The
+#     last 4.x line (4.56.x) has Qwen2.5-Omni and works with torch 2.5.1.
+#   * Qwen3-Omni needs transformers>=4.57 (i.e. 5.x), which in turn needs
+#     torch>=2.7 — NOT available as a cu121 wheel. Qwen3-Omni is therefore not
+#     runnable on this stack without upgrading CUDA/torch; use Qwen2.5-Omni.
 #   * torch 2.5.1 is the newest cu121 wheel and runs fine under Leonardo's
 #     `module load cuda/12.2`.
 #   * numpy must stay <2 to match the cu121 torch wheels' build.
 torch==2.5.1
 torchaudio==2.5.1
-transformers>=4.52
+transformers>=4.52,<5
 accelerate>=0.30
 numpy<2

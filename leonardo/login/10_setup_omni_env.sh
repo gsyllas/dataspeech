@@ -56,10 +56,12 @@ pip install --upgrade pip
 pip install --index-url https://download.pytorch.org/whl/cu121 \
   "torch==$TORCH_VERSION" "torchaudio==$TORCH_VERSION"
 
-# Transformers floor: 4.52 for Qwen2.5-Omni. If you set OMNI_MODEL_ID to a
-# Qwen3-Omni checkpoint, bump to >=4.57 first:
-#   TRANSFORMERS_SPEC='transformers>=4.57' bash leonardo/login/10_setup_omni_env.sh
-TRANSFORMERS_SPEC="${TRANSFORMERS_SPEC:-transformers>=4.52}"
+# Transformers spec: 4.52 <= v < 5 for Qwen2.5-Omni.
+# MUST stay <5: transformers 5.x imports torch.float8_e8m0fnu at load time,
+# which needs torch>=2.7. Leonardo is pinned to torch 2.5.1 (newest cu121
+# wheel), so 5.x cannot import. Qwen3-Omni (needs transformers>=4.57 / 5.x) is
+# therefore not runnable on this stack — use Qwen2.5-Omni here.
+TRANSFORMERS_SPEC="${TRANSFORMERS_SPEC:-transformers>=4.52,<5}"
 echo "[omni-setup] installing $TRANSFORMERS_SPEC + audio deps (pinned by $OMNI_CONSTRAINTS)"
 pip install -c "$OMNI_CONSTRAINTS" \
   "$TRANSFORMERS_SPEC" \
@@ -83,19 +85,24 @@ print("[omni-setup] torch:", torch.__version__,
       "transformers:", transformers.__version__,
       "datasets:", datasets.__version__)
 import os
+if int(transformers.__version__.split(".")[0]) >= 5:
+    raise RuntimeError(
+        f"transformers {transformers.__version__} (5.x) imports torch.float8_e8m0fnu, "
+        "which needs torch>=2.7. This stack is pinned to torch 2.5.1 (cu121). "
+        "Reinstall a 4.x: pip install -c leonardo/login/omni-constraints.txt 'transformers<5'"
+    )
 model_id = os.environ.get("OMNI_MODEL_ID", "Qwen/Qwen2.5-Omni-7B")
 name = model_id.lower()
-ok = False
 if "qwen3" in name or "omni3" in name:
-    ok = hasattr(transformers, "Qwen3OmniMoeForConditionalGeneration")
-    need = "transformers>=4.57"
-else:
-    ok = hasattr(transformers, "Qwen2_5OmniForConditionalGeneration")
-    need = "transformers>=4.52"
-if not ok:
     raise RuntimeError(
-        f"transformers {transformers.__version__} lacks the Omni classes for "
-        f"{model_id!r}; need {need}. Re-run with TRANSFORMERS_SPEC='{need}'."
+        f"{model_id!r} needs transformers>=4.57 (5.x) and torch>=2.7, which is not "
+        "available as a cu121 wheel on Leonardo. Use a Qwen2.5-Omni model instead "
+        "(e.g. Qwen/Qwen2.5-Omni-7B or Qwen/Qwen2.5-Omni-3B)."
+    )
+if not hasattr(transformers, "Qwen2_5OmniForConditionalGeneration"):
+    raise RuntimeError(
+        f"transformers {transformers.__version__} lacks Qwen2_5OmniForConditionalGeneration; "
+        "need transformers>=4.52,<5."
     )
 print(f"[omni-setup] Omni classes available for {model_id}")
 print("[omni-setup] CUDA available (login node, may be False):", torch.cuda.is_available())

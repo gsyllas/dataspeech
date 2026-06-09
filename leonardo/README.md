@@ -224,29 +224,27 @@ python leonardo/login/11_inspect_omni_outputs.py --root "$NAMED_OUT_ROOT" --data
 
 ### Which Omni model? (2.5 vs 3)
 
-The default is **`Qwen/Qwen2.5-Omni-7B`** because it cleanly fits a single
-A100 64GB in bf16 (talker disabled) and is supported by stable
-`transformers>=4.52`. **Qwen3-Omni** (`Qwen3-Omni-30B-A3B-*`) is newer and
-stronger but is a ~30B MoE: its weights alone need ~60GB, so it does not
-comfortably fit one 64GB GPU in bf16 (you would need multi-GPU or
-quantization) and it requires `transformers>=4.57`.
+The default is **`Qwen/Qwen2.5-Omni-7B`**: it fits a single A100 64GB in bf16
+(talker disabled) and runs on `transformers>=4.52,<5`, which is the newest
+transformers compatible with this stack.
 
-The script supports **both** — it picks the right classes from
-`OMNI_MODEL_ID`. To use Qwen3-Omni, rebuild the env with the newer
-transformers floor and point the env var at it:
+**Qwen3-Omni is not runnable here.** It needs `transformers>=4.57` (the 5.x
+line), and transformers 5.x imports `torch.float8_e8m0fnu` at load time — a
+dtype that only exists in `torch>=2.7`. Leonardo is pinned to **torch 2.5.1**
+(the newest `cu121` wheel under `module load cuda/12.2`), so transformers 5.x
+cannot even import. On top of that Qwen3-Omni is a ~30B MoE (~60GB of weights)
+that would not fit one 64GB GPU in bf16. Running it would require a newer
+CUDA/torch stack (and likely multi-GPU). Stick with Qwen2.5-Omni here.
 
-```bash
-TRANSFORMERS_SPEC='transformers>=4.57' bash leonardo/login/10_setup_omni_env.sh
-export OMNI_MODEL_ID="Qwen/Qwen3-Omni-30B-A3B-Instruct"
-python leonardo/login/09_cache_omni_model.py
-# Consider --gres=gpu:2 (edit 45_prompt_omni.slurm) for the 30B MoE.
-bash leonardo/slurm/submit_omni.sh greek_female_tts
-```
+> The `transformers>=4.52,<5` cap is enforced in
+> [omni-constraints.txt](login/omni-constraints.txt). If you ever installed
+> transformers 5.x by mistake, fix the env with:
+> `pip install -c leonardo/login/omni-constraints.txt 'transformers<5'`
 
-Change the prompt style (or use the smaller 3B Omni) before submitting:
+Use the smaller 3B Omni or change the prompt style before submitting:
 
 ```bash
-export OMNI_MODEL_ID="Qwen/Qwen2.5-Omni-3B"   # smaller/faster
+export OMNI_MODEL_ID="Qwen/Qwen2.5-Omni-3B"   # smaller/faster, still fits
 export OMNI_PROMPT_STYLE="rich"               # parler | rich | minimal
 bash leonardo/slurm/submit_omni.sh greek_female_tts
 ```
